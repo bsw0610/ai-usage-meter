@@ -28,6 +28,8 @@ const DASH = '—'
 const BAR_CELLS = 10
 // 이보다 적게 썼으면 표본이 작아 소진을 예측하지 않는다.
 const MIN_PERCENT_TO_PROJECT = 20
+// 값이 창의 이만큼(5시간 창은 20분, 주간 창은 약 11시간) 그대로면 쓰지 않는 것으로 보고 소진을 예측하지 않는다.
+const STILL_SHARE_OF_WINDOW = 1 / 15
 
 // 터미널 칸 수. 한글·한자·전각은 2칸, 그 밖에는 1칸(·와 —도 1칸으로 본다).
 export function displayWidth(text: string): number {
@@ -102,6 +104,7 @@ export function barAlt({ percent, elapsedMs, windowMs }: Bar): string {
 function msToExhaust(r: PercentLimit, observedAt: number, now: number): number | undefined {
   if (r.windowMs === undefined || r.resetsAt === undefined) return undefined
   if (r.percent < MIN_PERCENT_TO_PROJECT || r.percent >= 100) return undefined
+  if (r.changedAt !== undefined && now - r.changedAt >= r.windowMs * STILL_SHARE_OF_WINDOW) return undefined
   const elapsed = r.windowMs - (r.resetsAt - observedAt)
   if (elapsed <= 0) return undefined
   const fromStart = (elapsed * 100) / r.percent

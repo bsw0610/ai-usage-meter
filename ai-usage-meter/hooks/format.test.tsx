@@ -117,6 +117,29 @@ test('slower than the window lasts: shows the reset, with no color', () => {
   expect(colorOf(slow)).toBeUndefined()
 })
 
+test('a value that stopped moving gets no projection, after a fifteenth of its window', () => {
+  const still = (r: any, ago: number) => ({ ...r, changedAt: NOW - ago })
+  const fast = windowed(51, 4 * HOUR)
+  expect(one(still(fast, 19 * 60_000))).toContain('뒤 소진')
+  expect(colorOf(still(fast, 19 * 60_000))).toBe('warning')
+  expect(one(still(fast, 20 * 60_000))).toBe('A ━━┃━━───── 51% (리셋 4h)')
+  expect(colorOf(still(fast, 20 * 60_000))).toBeUndefined()
+
+  // 주간 값은 천천히 움직이므로 같은 비율이면 훨씬 오래 기다린다.
+  const week = windowed(60, 3 * DAY, 7 * DAY)
+  expect(colorOf(still(week, 11 * HOUR))).toBe('warning')
+  expect(colorOf(still(week, 12 * HOUR))).toBeUndefined()
+
+  // 다 쓴 한도는 멈춰 있어도 다 쓴 것이다.
+  expect(colorOf(still(windowed(100, 4 * HOUR), 3 * HOUR))).toBe('error')
+})
+
+test('with room for one row, a limit standing still is not the urgent one', () => {
+  const reading = { ...both(82, 3.116 * HOUR, 60, 3 * DAY), changedAt: NOW - HOUR }
+  const line = formatLine([{ label: 'A', reading }, { label: 'B', reading: null }], NOW, Infinity, 1)
+  expect(line).toContain('A 주간')
+})
+
 test('the rate comes from when the value was read, not from now', () => {
   // 30분 전에 읽은 값: 그때 5시간 창에서 1시간에 51%. 소진은 그로부터 약 58분 뒤라 지금부터 약 28분 뒤.
   const old = windowed(51, 3.5 * HOUR, 5 * HOUR, NOW - HOUR / 2)

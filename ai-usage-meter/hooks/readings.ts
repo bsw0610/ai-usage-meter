@@ -1,6 +1,6 @@
 import type { EngineInterface } from 'claude-code'
 
-import type { Attempt, Reading } from '../types/index'
+import type { Attempt, PercentLimit, Reading } from '../types/index'
 import { DEFAULT_TTL_MS } from './providers/types'
 import type { Io, Provider } from './providers/types'
 
@@ -11,8 +11,8 @@ const ref = { plugin: 'ai-usage-meter', key: 'readings' } as const
 const attemptsRef = { plugin: 'ai-usage-meter', key: 'attempts' } as const
 // 저장소는 열린 세션끼리 공유한다. 이전 코드로 도는 세션은 새 필드를 모른 채 값을 덮어쓰므로,
 // Reading의 모양이 바뀌면 키의 버전을 올려 서로 섞이지 않게 한다.
-const STORE_KEY = 'readings-v2'
-const ATTEMPTS_KEY = 'attempts-v2'
+const STORE_KEY = 'readings-v3'
+const ATTEMPTS_KEY = 'attempts-v3'
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -72,14 +72,30 @@ export async function pullFromStore($: EngineInterface): Promise<void> {
   }
 }
 
+// 값이 그대로면 직전의 changedAt을 잇고, 바뀌었거나 처음 보면 관측 시각으로 둔다.
+function withChangedAt<T extends PercentLimit>(limit: T, prev: PercentLimit | undefined, at: number): T {
+  return { ...limit, changedAt: prev?.percent === limit.percent ? (prev.changedAt ?? at) : at }
+}
+
+function stamped(reading: Reading | null, prev: Reading | null | undefined): Reading | null {
+  if (reading?.kind !== 'percent') return reading
+  const last = prev?.kind === 'percent' ? prev : undefined
+  const { observedAt, secondary } = reading
+  return {
+    ...withChangedAt(reading, last, observedAt),
+    ...(secondary ? { secondary: withChangedAt(secondary, last?.secondary, observedAt) } : {}),
+  }
+}
+
 // 한 소스의 값을 바꾼다. 같은 값이면 쓰지 않아 다시 그리지 않는다.
 // 두 소스가 동시에 끝나도 서로의 값을 덮지 않도록 버전을 확인하고, 어긋나면 다시 읽어 쓴다.
 export async function put($: EngineInterface, id: string, reading: Reading | null): Promise<void> {
   for (let i = 0; i < 5; i++) {
     const { value = {}, version } = await $.state.get(ref)
     const prev = value[id]
-    if (prev !== undefined && JSON.stringify(prev) === JSON.stringify(reading)) return
-    const next = { ...value, [id]: reading }
+    const current = stamped(reading, prev)
+    if (prev !== undefined && JSON.stringify(prev) === JSON.stringify(current)) return
+    const next = { ...value, [id]: current }
     const { isSet } = await $.state.set(ref, next, { ifVersion: version })
     if (isSet) {
       await $.store.set(STORE_KEY, mergeReadings(next, await storedReadings($)))
