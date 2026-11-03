@@ -285,6 +285,99 @@ test('the band draws one row per source, on both surfaces', async ($, on) => {
   await oneRow.unmount()
 })
 
+test('each language has its own words for the reset, the days, the weekly limit and the bar', () => {
+  const list = [{ label: 'Codex', short: 'Cx', reading: both(82, 3.116 * HOUR, 46, 45 * HOUR) }]
+  const line = (lang: 'en' | 'ja', columns = Infinity) => formatLine(list, NOW, columns, Infinity, lang)
+
+  expect(line('en')).toBe('Codex ━━━━━━━━── 82% (resets 3h7m) · Weekly ━━━━╸───── 46% (resets 1d 21h)')
+  expect(line('en', 40)).toBe('Codex 82% 3h · Weekly 46% 45h')
+  expect(line('en', 10)).toBe('Cx 82% · Wk 46%')
+  expect(barAlt({ percent: 51.4 }, 'en')).toBe('51% used')
+
+  expect(line('ja')).toBe('Codex ━━━━━━━━── 82% (リセット 3h7m) · 週間 ━━━━╸───── 46% (リセット 1日21時間)')
+  expect(line('ja', 40)).toBe('Codex 82% 3h · 週間 46% 45h')
+  expect(line('ja', 10)).toBe('Cx 82% · 週 46%')
+  expect(barAlt({ percent: 51.4 }, 'ja')).toBe('51%使用')
+
+  const whole = (lang: 'en' | 'ja', ms: number) => formatLine([{ label: 'A', reading: percent(1, ms) }], NOW, Infinity, Infinity, lang)
+  expect(whole('en', 48 * HOUR)).toBe('A ╸───────── 1% (resets 2d)')
+  expect(whole('ja', 48 * HOUR)).toBe('A ╸───────── 1% (リセット 2日)')
+})
+
+test('each language says why a value is missing', () => {
+  const list = [{ id: 'a', label: 'Alpha', short: 'A' }]
+  const old = { a: { kind: 'percent' as const, percent: 9, observedAt: NOW - HOUR } }
+  const failed = { a: { at: NOW, isOk: false } }
+  const missing = { a: { at: NOW, isOk: false, isMissing: true } }
+  const at = (lang: 'en' | 'ja', readings: any, attempts?: any) => lineFor(list, readings, NOW, Infinity, Infinity, attempts, lang)
+
+  expect(at('en', {}, failed)).toBe('Alpha — failed')
+  expect(at('en', {}, missing)).toBe('Alpha — not installed')
+  expect(at('en', old)).toBe('Alpha — stale')
+  expect(at('ja', {}, failed)).toBe('Alpha — 失敗')
+  expect(at('ja', {}, missing)).toBe('Alpha — 未インストール')
+  expect(at('ja', old)).toBe('Alpha — 古い値')
+})
+
+test('kana counts as two cells, so a narrow Japanese line shrinks in time', () => {
+  expect(displayWidth('リセット')).toBe(8)
+  expect(displayWidth('未インストール')).toBe(14)
+})
+
+test('at the width of a real window, every language keeps both limits with their reset', () => {
+  const list = [
+    { label: 'Codex', short: 'Cx', reading: both(82, 3.116 * HOUR, 46, 45 * HOUR) },
+    { label: 'Gemini(AG)', short: 'AG', reading: both(25, 3 * HOUR, 10, 5 * DAY) },
+  ]
+  const rows = (lang: 'ko' | 'en' | 'ja') => formatLine(list, NOW, 85, Infinity, lang).split('\n')
+  expect(rows('ko')[0]).toBe('Codex      ━━━━━━━━── 82% (리셋 3h7m) · 주간 ━━━━╸───── 46% (리셋 1일 21시간)')
+  expect(rows('en')[0]).toBe('Codex      ━━━━━━━━── 82% (resets 3h7m) · Weekly ━━━━╸───── 46% (resets 1d 21h)')
+  expect(rows('ja')[0]).toBe('Codex      ━━━━━━━━── 82% (リセット 3h7m) · 週間 ━━━━╸───── 46% (リセット 1日21時間)')
+})
+
+for (const [language, row, alt] of [
+  ['en', 'Codex      ━━━━━━━━── 82% (resets 3h7m) · Weekly ━━━━╸───── 46% (resets 1d 21h)', '82% used'],
+  ['ja', 'Codex      ━━━━━━━━── 82% (リセット 3h7m) · 週間 ━━━━╸───── 46% (リセット 1日21時間)', '82%使用'],
+] as const) {
+  test(`the language option reaches the band, on both surfaces: ${language}`, { options: { language } }, async ($, on) => {
+    mock.clock(on, { now: NOW })
+    const value = { codex: both(82, 3.116 * HOUR, 46, 45 * HOUR), gemini: both(25, 3 * HOUR, 10, 5 * DAY) }
+    on('state.get', () => ({ value: { value, version: 0 } }))
+    on('ui.render', () => ({ type: 'engine', ref: 0 }))
+    const mount = (surface: 'terminal' | 'desktop') =>
+      $.ui.mount({
+        plugin: 'ai-usage-meter',
+        component: 'AbovePrompt',
+        requestId: 'band',
+        surface,
+        props: { hasSurvey: false, isWorking: false, bodyColumns: 100, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
+      })
+
+    const terminal = await mount('terminal')
+    expect((await terminal.find({ type: 'Text', text: /^Codex/ }))?.text).toBe(row)
+    await terminal.unmount()
+
+    const desktop = await mount('desktop')
+    expect((await desktop.findAll({ type: 'Svg' }))[0]?.props.alt).toBe(alt)
+    await desktop.unmount()
+  })
+}
+
+test('with no language chosen, or one not on the list, the band stays in Korean', { options: { language: 'fr' } }, async ($, on) => {
+  mock.clock(on, { now: NOW })
+  on('state.get', () => ({ value: { value: { codex: percent(50, HOUR) }, version: 0 } }))
+  on('ui.render', () => ({ type: 'engine', ref: 0 }))
+  const ui = await $.ui.mount({
+    plugin: 'ai-usage-meter',
+    component: 'AbovePrompt',
+    requestId: 'band',
+    surface: 'terminal',
+    props: { hasSurvey: false, isWorking: false, bodyColumns: 100, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
+  })
+  expect((await ui.find({ type: 'Text', text: /^Codex/ }))?.text).toContain('(리셋 1h)')
+  await ui.unmount()
+})
+
 const LIVE = JSON.stringify({ limitId: 'codex', windows: [{ usedPercent: 18, windowDurationMins: 300, resetsAt: SEC + 7200 }] })
 const AGY = ['Gemini Models', 'Five Hour Limit Remaining', '75%', new Date(NOW + 3 * HOUR).toISOString()].join('\t') + '\n'
 

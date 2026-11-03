@@ -2,7 +2,7 @@ import type { Register, RenderChildren } from 'claude-code'
 
 import type {} from '../types/index'
 import type { Cell } from './format'
-import { BAR_HEIGHT_PX, BAR_WIDTH_PX, barAlt, barSvg, columnWidths, partsOf, rowsFor } from './format'
+import { BAR_HEIGHT_PX, BAR_WIDTH_PX, DEFAULT_LANG, barAlt, barSvg, columnWidths, isLang, partsOf, rowsFor } from './format'
 import { providers } from './providers'
 import { pullFromStore, put, refreshDue } from './readings'
 
@@ -11,7 +11,9 @@ const TICK_MS = 30_000
 const readings = { plugin: 'ai-usage-meter', key: 'readings' } as const
 const attempts = { plugin: 'ai-usage-meter', key: 'attempts' } as const
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
+  const lang = isLang(options.language) ? options.language : DEFAULT_LANG
+
   on('session.start', async ($, e, next) => {
     await pullFromStore($)
     // 조회는 세션 시작을 막지 않는다. 타이머가 주기적으로 깨어나 조회할 때가 된 소스만 조회하고,
@@ -40,7 +42,7 @@ export const register: Register = on => {
 
     const { value = {} } = await $.state.get(readings)
     const { value: lastAttempts = {} } = await $.state.get(attempts)
-    const rows = rowsFor(providers, value, await $.clock.now(), e.props.bodyColumns, e.props.maxRows, lastAttempts)
+    const rows = rowsFor(providers, value, await $.clock.now(), e.props.bodyColumns, e.props.maxRows, lastAttempts, lang)
     const widths = columnWidths(rows)
     const { Box, Text } = $.ui.resolve(e)
     const textOf = (text: string, color?: 'error') =>
@@ -64,7 +66,7 @@ export const register: Register = on => {
           {cells.flatMap((c, j) => [
             ...(j ? [textOf('·')] : []),
             sized(textOf(c.label), widths.label[j]),
-            ...(c.bar ? [<Svg source={barSvg(c.bar, c.color)} alt={barAlt(c.bar)} width={BAR_WIDTH_PX} height={BAR_HEIGHT_PX} />] : []),
+            ...(c.bar ? [<Svg source={barSvg(c.bar, c.color)} alt={barAlt(c.bar, lang)} width={BAR_WIDTH_PX} height={BAR_HEIGHT_PX} />] : []),
             sized(textOf(c.value, c.color), j < cells.length - 1 ? widths.value[j] : undefined),
           ])}
         </Box>
