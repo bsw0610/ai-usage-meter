@@ -1,6 +1,6 @@
 import type { EngineInterface } from 'claude-code'
 
-import type { Attempt, PercentLimit, Reading } from '../types/index'
+import type { Attempt, Reading } from '../types/index'
 import { DEFAULT_TTL_MS, ReadFailure } from './providers/types'
 import type { Io, Provider } from './providers/types'
 
@@ -80,30 +80,14 @@ export async function pullFromStore($: EngineInterface): Promise<void> {
   }
 }
 
-// 값이 그대로면 직전의 changedAt을 잇고, 바뀌었거나 처음 보면 관측 시각으로 둔다.
-function withChangedAt<T extends PercentLimit>(limit: T, prev: PercentLimit | undefined, at: number): T {
-  return { ...limit, changedAt: prev?.percent === limit.percent ? (prev.changedAt ?? at) : at }
-}
-
-function stamped(reading: Reading | null, prev: Reading | null | undefined): Reading | null {
-  if (reading?.kind !== 'percent') return reading
-  const last = prev?.kind === 'percent' ? prev : undefined
-  const { observedAt, secondary } = reading
-  return {
-    ...withChangedAt(reading, last, observedAt),
-    ...(secondary ? { secondary: withChangedAt(secondary, last?.secondary, observedAt) } : {}),
-  }
-}
-
 // 한 소스의 값을 바꾼다. 같은 값이면 쓰지 않아 다시 그리지 않는다.
 // 두 소스가 동시에 끝나도 서로의 값을 덮지 않도록 버전을 확인하고, 어긋나면 다시 읽어 쓴다.
 export async function put($: EngineInterface, id: string, reading: Reading | null): Promise<void> {
   for (let i = 0; i < 5; i++) {
     const { value = {}, version } = await $.state.get(ref)
     const prev = value[id]
-    const current = stamped(reading, prev)
-    if (prev !== undefined && JSON.stringify(prev) === JSON.stringify(current)) return
-    const next = { ...value, [id]: current }
+    if (prev !== undefined && JSON.stringify(prev) === JSON.stringify(reading)) return
+    const next = { ...value, [id]: reading }
     const { isSet } = await $.state.set(ref, next, { ifVersion: version })
     if (isSet) {
       await $.store.set(STORE_KEY, mergeReadings(next, await storedReadings($)))

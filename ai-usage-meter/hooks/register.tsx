@@ -43,7 +43,7 @@ export const register: Register = on => {
     const rows = rowsFor(providers, value, await $.clock.now(), e.props.bodyColumns, e.props.maxRows, lastAttempts)
     const widths = columnWidths(rows)
     const { Box, Text } = $.ui.resolve(e)
-    const textOf = (text: string, color?: 'warning' | 'error') =>
+    const textOf = (text: string, color?: 'error') =>
       color ? <Text color={color} wrap="truncate-end">{text}</Text> : <Text dimColor wrap="truncate-end">{text}</Text>
 
     const rowOf = (cells: Cell[]) => {

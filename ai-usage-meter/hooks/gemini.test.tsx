@@ -95,9 +95,9 @@ test('a failing agy does not blank Codex', async ($, on) => {
 
 test('parseUsage: weekly is the fallback, remaining becomes used, other groups are ignored', () => {
   const weekly = row('Gemini Models', 'Weekly Limit Remaining', '90%', '2026-11-10T00:00:00Z')
-  expect(parseUsage(weekly, NOW)).toEqual({ kind: 'percent', percent: 10, windowMs: 7 * 86_400_000, resetsAt: Date.parse('2026-11-10T00:00:00Z'), observedAt: NOW })
+  expect(parseUsage(weekly, NOW)).toEqual({ kind: 'percent', percent: 10, resetsAt: Date.parse('2026-11-10T00:00:00Z'), observedAt: NOW })
   expect(parseUsage(row('Claude and GPT models', 'Five Hour Limit Remaining', '10%', 'x'), NOW)).toBeUndefined()
-  expect(parseUsage(row('Gemini Models', 'Five Hour Limit Remaining', '100%', 'bad'), NOW)).toEqual({ kind: 'percent', percent: 0, windowMs: 5 * 3_600_000, observedAt: NOW })
+  expect(parseUsage(row('Gemini Models', 'Five Hour Limit Remaining', '100%', 'bad'), NOW)).toEqual({ kind: 'percent', percent: 0, observedAt: NOW })
 })
 
 test('parseUsage: with both limits, the weekly one comes along as used percent', () => {
@@ -108,9 +108,8 @@ test('parseUsage: with both limits, the weekly one comes along as used percent',
   expect(parseUsage(text, NOW)).toEqual({
     kind: 'percent',
     percent: 25,
-    windowMs: 5 * 3_600_000,
     resetsAt: Date.parse('2026-11-04T13:00:00Z'),
-    secondary: { percent: 10, windowMs: 7 * 86_400_000, resetsAt: Date.parse('2026-11-10T00:00:00Z') },
+    secondary: { percent: 10, resetsAt: Date.parse('2026-11-10T00:00:00Z') },
     observedAt: NOW,
   })
 })

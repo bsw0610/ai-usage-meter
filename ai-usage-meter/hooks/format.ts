@@ -7,10 +7,9 @@ type Trouble = 'failed' | 'missing' | 'stale'
 type Entry = { label: string; short?: string; reading: Reading | null | undefined; trouble?: Trouble }
 
 // 줄의 한 조각. color가 있으면 그 색으로, 없으면 흐리게 그린다.
-export type Part = { text: string; color?: 'warning' | 'error' }
+export type Part = { text: string; color?: 'error' }
 
-// 막대의 값. 창 길이를 모르면 시간 표시 없이 사용량만 그린다.
-export type Bar = { percent: number; elapsedMs?: number; windowMs?: number }
+export type Bar = { percent: number }
 
 // 한도 하나의 표시. Svg를 그리는 표면은 칸별로, 터미널은 한 줄로 합쳐 그린다.
 export type Cell = { label: string; bar?: Bar; value: string; color?: Part['color'] }
@@ -30,10 +29,6 @@ const STEPS: Step[] = [
 const DASH = '—'
 const TROUBLE_TEXT: Record<Trouble, string> = { failed: '실패', missing: '미설치', stale: '오래됨' }
 const BAR_CELLS = 10
-// 이보다 적게 썼으면 표본이 작아 소진을 예측하지 않는다.
-const MIN_PERCENT_TO_PROJECT = 20
-// 값이 창의 이만큼(5시간 창은 20분, 주간 창은 약 11시간) 그대로면 쓰지 않는 것으로 보고 소진을 예측하지 않는다.
-const STILL_SHARE_OF_WINDOW = 1 / 15
 
 // 터미널 칸 수. 한글·한자·전각은 2칸, 그 밖에는 1칸(·와 —도 1칸으로 본다).
 export function displayWidth(text: string): number {
@@ -74,81 +69,55 @@ function shortCount(n: number): string {
 
 // 터미널에는 Svg가 없어 선 문자로 그린다. 반 칸(5%) 단위가 한계다.
 // 조금이라도 썼으면 반 칸은 채우고, 다 쓰기 전에는 다 채우지 않는다.
-function barText({ percent, elapsedMs, windowMs }: Bar): string {
+function barText({ percent }: Bar): string {
   const halves = percent <= 0 ? 0 : percent >= 100 ? 2 * BAR_CELLS : Math.min(2 * BAR_CELLS - 1, Math.max(1, Math.round(percent / 5)))
   const whole = Math.floor(halves / 2)
-  const cells: string[] = Array.from({ length: BAR_CELLS }, (_, i) => (i < whole ? '━' : i === whole && halves % 2 ? '╸' : '─'))
-  if (elapsedMs !== undefined && windowMs) cells[Math.min(BAR_CELLS - 1, Math.floor((elapsedMs * BAR_CELLS) / windowMs))] = '┃'
-  return cells.join('')
+  return Array.from({ length: BAR_CELLS }, (_, i) => (i < whole ? '━' : i === whole && halves % 2 ? '╸' : '─')).join('')
 }
 
 export const BAR_WIDTH_PX = 80
 export const BAR_HEIGHT_PX = 12
 
 // Svg는 이미지로 그려져 테마 색을 받지 못하므로, 밝은 화면과 어두운 화면 모두에서 보이는 중간 색을 쓴다.
-const BAR_COLORS = { warning: '#d97706', error: '#dc2626' }
+const BAR_COLORS = { error: '#dc2626' }
 const BAR_NEUTRAL = '#8c8c8c'
 const BAR_TRACK = 'rgba(140,140,140,0.3)'
 const BAR_INSET_PX = 2
 
-// 값 그대로의 위치에 그리는 선. 창에서 지나간 시간은 선을 가로지르는 짧은 눈금이다.
-export function barSvg({ percent, elapsedMs, windowMs }: Bar, color?: Part['color']): string {
+// 값 그대로의 위치에 그리는 선.
+export function barSvg({ percent }: Bar, color?: Part['color']): string {
   const mid = BAR_HEIGHT_PX / 2
   const at = (ratio: number) => (BAR_INSET_PX + Math.min(1, Math.max(0, ratio)) * (BAR_WIDTH_PX - 2 * BAR_INSET_PX)).toFixed(2)
   const line = (x1: string, x2: string, stroke: string) =>
     `<line x1="${x1}" y1="${mid}" x2="${x2}" y2="${mid}" stroke="${stroke}" stroke-width="3" stroke-linecap="round"/>`
   const fill = percent > 0 ? line(at(0), at(percent / 100), color ? BAR_COLORS[color] : BAR_NEUTRAL) : ''
-  const tick =
-    elapsedMs !== undefined && windowMs
-      ? `<line x1="${at(elapsedMs / windowMs)}" y1="1" x2="${at(elapsedMs / windowMs)}" y2="${BAR_HEIGHT_PX - 1}" stroke="${BAR_NEUTRAL}" stroke-width="1.5" stroke-linecap="round"/>`
-      : ''
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${BAR_WIDTH_PX}" height="${BAR_HEIGHT_PX}" viewBox="0 0 ${BAR_WIDTH_PX} ${BAR_HEIGHT_PX}">${line(at(0), at(1), BAR_TRACK)}${fill}${tick}</svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${BAR_WIDTH_PX}" height="${BAR_HEIGHT_PX}" viewBox="0 0 ${BAR_WIDTH_PX} ${BAR_HEIGHT_PX}">${line(at(0), at(1), BAR_TRACK)}${fill}</svg>`
 }
 
-export function barAlt({ percent, elapsedMs, windowMs }: Bar): string {
-  const used = `${Math.round(percent)}% 사용`
-  return elapsedMs !== undefined && windowMs ? `${used}, 창의 ${Math.round((elapsedMs * 100) / windowMs)}% 지남` : used
-}
+export const barAlt = ({ percent }: Bar): string => `${Math.round(percent)}% 사용`
 
-// 관측 시점까지의 속도가 이어지면 리셋 전에 소진될 때, 지금부터 소진까지 남은 시간.
-function msToExhaust(r: PercentLimit, observedAt: number, now: number): number | undefined {
-  if (r.windowMs === undefined || r.resetsAt === undefined) return undefined
-  if (r.percent < MIN_PERCENT_TO_PROJECT || r.percent >= 100) return undefined
-  if (r.changedAt !== undefined && now - r.changedAt >= r.windowMs * STILL_SHARE_OF_WINDOW) return undefined
-  const elapsed = r.windowMs - (r.resetsAt - observedAt)
-  if (elapsed <= 0) return undefined
-  const fromStart = (elapsed * 100) / r.percent
-  if (fromStart >= r.windowMs) return undefined
-  const ms = r.resetsAt - r.windowMs + fromStart - now
-  return ms > 0 ? ms : undefined // 예측한 시각이 이미 지났으면 값이 낡은 것이다
-}
-
-function limitCell(r: PercentLimit, observedAt: number, now: number, step: Step): Omit<Cell, 'label'> {
+function limitCell(r: PercentLimit, now: number, step: Step): Omit<Cell, 'label'> {
   const left = r.resetsAt === undefined ? undefined : r.resetsAt - now
   // 리셋 시각이 지난 창은 새 창이 열린 것이므로 0%.
   if (left !== undefined && left <= 0) return { ...(step.hasBar ? { bar: { percent: 0 } } : {}), value: '0%' }
 
-  const hasWindow = r.windowMs !== undefined && left !== undefined && left <= r.windowMs
-  const bar: Bar = { percent: r.percent, ...(hasWindow ? { elapsedMs: r.windowMs! - left!, windowMs: r.windowMs! } : {}) }
   const percent = `${Math.round(r.percent)}%`
-  const exhaust = msToExhaust(r, observedAt, now)
-  const color = r.percent >= 100 ? 'error' : exhaust !== undefined ? 'warning' : undefined
   const tail =
-    exhaust !== undefined
-      ? step.detail === 'full' ? `약 ${until(exhaust, true)} 뒤 소진` : step.detail === 'hours' ? `소진 ${until(exhaust)}` : undefined
-      : left === undefined ? undefined
-      : step.detail === 'full' ? `(리셋 ${until(left, true)})` : step.detail === 'hours' ? until(left) : undefined
-  return { ...(step.hasBar ? { bar } : {}), value: tail ? `${percent} ${tail}` : percent, ...(color ? { color } : {}) }
+    left === undefined ? undefined
+    : step.detail === 'full' ? `(리셋 ${until(left, true)})`
+    : step.detail === 'hours' ? until(left)
+    : undefined
+  return {
+    ...(step.hasBar ? { bar: { percent: r.percent } } : {}),
+    value: tail ? `${percent} ${tail}` : percent,
+    ...(r.percent >= 100 ? { color: 'error' as const } : {}),
+  }
 }
 
-// 다 쓴 한도, 소진이 더 가까운 한도, 더 많이 쓴 한도 순으로 급하다.
-function isMoreUrgent(a: PercentLimit, b: PercentLimit, observedAt: number, now: number): boolean {
-  const score = (r: PercentLimit): [number, number] => {
-    if (r.resetsAt !== undefined && r.resetsAt <= now) return [Infinity, 0]
-    return [r.percent >= 100 ? -1 : (msToExhaust(r, observedAt, now) ?? Infinity), r.percent]
-  }
-  const [x, y] = [score(a), score(b)]
-  return x[0] !== y[0] ? x[0] < y[0] : x[1] > y[1]
+// 더 많이 쓴 한도가 더 급하다. 리셋이 지난 창은 새로 시작했으므로 0%로 친다.
+function isMoreUrgent(a: PercentLimit, b: PercentLimit, now: number): boolean {
+  const used = (r: PercentLimit) => (r.resetsAt !== undefined && r.resetsAt <= now ? 0 : r.percent)
+  return used(a) > used(b)
 }
 
 // 소스 하나의 칸들. 나란히 놓을 수 없으면 더 급한 한도 하나만 남긴다.
@@ -160,12 +129,12 @@ function cellsOf(e: Entry, now: number, step: Step, isStacked: boolean): Cell[] 
     const count = shortCount(r.count)
     return [{ label, value: step.isShort ? count : `${count} ${r.unit}` }]
   }
-  const primary = { label, ...limitCell(r, r.observedAt, now, step) }
+  const primary = { label, ...limitCell(r, now, step) }
   if (!r.secondary) return [primary]
-  const weekly = limitCell(r.secondary, r.observedAt, now, step)
+  const weekly = limitCell(r.secondary, now, step)
   const weeklyLabel = step.isShort ? '주' : '주간'
   if (isStacked) return [primary, { label: weeklyLabel, ...weekly }]
-  return [isMoreUrgent(r.secondary, r, r.observedAt, now) ? { label: `${label} ${weeklyLabel}`, ...weekly } : primary]
+  return [isMoreUrgent(r.secondary, r, now) ? { label: `${label} ${weeklyLabel}`, ...weekly } : primary]
 }
 
 // 여러 줄일 때 위아래가 맞도록, 칸 번호별로 이름과 값의 폭을 잰다.

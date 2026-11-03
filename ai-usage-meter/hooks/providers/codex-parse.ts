@@ -7,7 +7,6 @@ export type Window = { usedPercent: number; minutes: number; resetsAtSec: number
 
 const toLimit = (w: Window): PercentLimit => ({
   percent: w.usedPercent,
-  windowMs: w.minutes * 60_000,
   ...(typeof w.resetsAtSec === 'number' ? { resetsAt: w.resetsAtSec * 1000 } : {}),
 })
 

@@ -204,51 +204,6 @@ test('values an older version keeps writing are not read back', async ($, on) =>
   expect(store['readings-v2']).toEqual(old['readings-v2'])
 })
 
-const limits = (five: number, week: number) =>
-  JSON.stringify({
-    limitId: 'codex',
-    windows: [
-      { usedPercent: five, windowDurationMins: 300, resetsAt: SEC + 10_800 },
-      { usedPercent: week, windowDurationMins: 10_080, resetsAt: SEC + 86_400 },
-    ],
-  })
-
-test('each limit remembers when its value last moved, across polls', async ($, on) => {
-  const { clock, mode, store } = world(on)
-  mode.live = limits(80, 40)
-  await start($, clock)
-  const codex = () => (store['readings-v3'] as any).codex
-  expect([codex().changedAt, codex().secondary.changedAt]).toEqual([NOW, NOW])
-
-  await clock.advance(3 * MIN)
-  expect(codex().observedAt).toBe(NOW + 3 * MIN)
-  expect([codex().changedAt, codex().secondary.changedAt]).toEqual([NOW, NOW])
-
-  mode.live = limits(81, 40)
-  await clock.advance(3 * MIN)
-  expect([codex().changedAt, codex().secondary.changedAt]).toEqual([NOW + 6 * MIN, NOW])
-})
-
-test('when the value stands still the warning goes, and it returns once the value moves', async ($, on) => {
-  const { clock, mode } = world(on)
-  const wide = async () => {
-    const ui = await $.ui.mount({ ...BAND, surface: 'terminal', props: { ...BAND.props, bodyColumns: 200 } })
-    const text: string | undefined = (await ui.find({ type: 'Text', text: /Codex/ }))?.text
-    await ui.unmount()
-    return text
-  }
-  mode.live = JSON.stringify({ limitId: 'codex', windows: [{ usedPercent: 80, windowDurationMins: 300, resetsAt: SEC + 10_800 }] })
-  await start($, clock)
-  expect(await wide()).toContain('뒤 소진')
-
-  await clock.advance(20 * MIN)
-  expect(await wide()).toContain('80% (리셋 2h40m)')
-
-  mode.live = JSON.stringify({ limitId: 'codex', windows: [{ usedPercent: 85, windowDurationMins: 300, resetsAt: SEC + 10_800 }] })
-  await clock.advance(3 * MIN)
-  expect(await wide()).toContain('85% 약')
-})
-
 async function wide($: any) {
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal', props: { ...BAND.props, bodyColumns: 200 } })
   const text: string | undefined = (await ui.find({ type: 'Text', text: /Codex/ }))?.text
