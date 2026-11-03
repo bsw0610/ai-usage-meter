@@ -20,8 +20,8 @@ function world(on: any, stored: Record<string, unknown> = {}) {
   const clock = mock.clock(on, { now: NOW })
   mock.env(on, { HOME: '/home/test' })
   const store: Record<string, unknown> = { ...stored }
-  const mode = { codex: 'ok', agy: 'ok', live: LIVE }
-  const calls = { node: 0, agy: 0, agyArgv: [] as string[] }
+  const mode = { codex: 'ok', agy: 'ok', live: LIVE, codexExit: 1, codexStderr: '' }
+  const calls = { node: 0, agy: 0, agyArgv: [] as string[], attemptWhileRunning: undefined as any }
   on('store.get', (_: unknown, e: any) => ({ value: store[e.key] }))
   on('store.set', (_: unknown, e: any) => {
     store[e.key] = JSON.parse(JSON.stringify(e.value))
@@ -43,7 +43,9 @@ function world(on: any, stored: Record<string, unknown> = {}) {
   on('process.run', (_: unknown, e: any) => {
     if (e.argv[0] === 'node') {
       calls.node++
-      return { value: { exitCode: mode.codex === 'ok' ? 0 : 1, stdout: mode.codex === 'ok' ? mode.live : '', stderr: '' } }
+      calls.attemptWhileRunning = (store['attempts-v3'] as any)?.codex
+      if (mode.codex === 'ok') return { value: { exitCode: 0, stdout: mode.live, stderr: '' } }
+      return { value: { exitCode: mode.codexExit, stdout: '', stderr: mode.codexStderr } }
     }
     if (e.argv[0] === 'agy') {
       calls.agy++
@@ -245,4 +247,74 @@ test('when the value stands still the warning goes, and it returns once the valu
   mode.live = JSON.stringify({ limitId: 'codex', windows: [{ usedPercent: 85, windowDurationMins: 300, resetsAt: SEC + 10_800 }] })
   await clock.advance(3 * MIN)
   expect(await wide()).toContain('85% 약')
+})
+
+async function wide($: any) {
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal', props: { ...BAND.props, bodyColumns: 200 } })
+  const text: string | undefined = (await ui.find({ type: 'Text', text: /Codex/ }))?.text
+  await ui.unmount()
+  return text
+}
+
+test('a failure leaves its reason in the store, and the band says it failed', async ($, on) => {
+  const { clock, mode, store } = world(on)
+  mode.codex = 'fail'
+  mode.codexStderr = 'timeout\n'
+  mode.agy = 'fail'
+  await start($, clock)
+  const attempts = store['attempts-v3'] as any
+  expect(attempts.codex.isOk).toBe(false)
+  expect(attempts.codex.isMissing).toBeUndefined()
+  expect(attempts.codex.error).toContain('helper exit 1: timeout')
+  expect(attempts.codex.error).toContain('log:')
+  expect(attempts.gemini.error).toContain('agy: ')
+  expect(await wide($)).toBe('Codex — 실패 · Gemini(AG) — 실패')
+})
+
+test('a program that is not there reads as not installed', async ($, on) => {
+  const { clock, mode, store } = world(on)
+  mode.codex = 'fail'
+  mode.codexExit = 2
+  await start($, clock)
+  expect((store['attempts-v3'] as any).codex.isMissing).toBe(true)
+  expect(await wide($)).toContain('Codex — 미설치')
+})
+
+test('a very long reason is cut before it is stored', async ($, on) => {
+  const { clock, mode, store } = world(on)
+  mode.codex = 'fail'
+  mode.codexStderr = 'x'.repeat(1000)
+  await start($, clock)
+  expect((store['attempts-v3'] as any).codex.error.length).toBe(200)
+})
+
+test("another session's failure and its reason survive the store", async ($, on) => {
+  const failed = { at: NOW, isOk: false, error: 'spawn agy ENOENT', isMissing: true }
+  const { clock, store } = world(on, { 'attempts-v3': { gemini: failed } })
+  await start($, clock)
+  expect(await wide($)).toContain('Gemini(AG) — 미설치')
+  expect((store['attempts-v3'] as any).gemini).toEqual(failed)
+})
+
+test('a retry keeps the failure until its result, and success clears the reason', async ($, on) => {
+  const { clock, mode, store, calls } = world(on)
+  mode.codex = 'fail'
+  mode.codexStderr = 'timeout'
+  await start($, clock)
+
+  mode.codex = 'ok'
+  await clock.advance(3 * MIN)
+  expect(calls.attemptWhileRunning.isOk).toBe(false)
+  expect(calls.attemptWhileRunning.at).toBe(NOW + 3 * MIN)
+  expect((store['attempts-v3'] as any).codex).toEqual({ at: NOW + 3 * MIN, isOk: true })
+  expect(await wide($)).toContain('Codex ')
+  expect(await wide($)).not.toContain('실패')
+})
+
+test('a value past its lifetime after a failure says failed, not old', async ($, on) => {
+  const { clock, mode } = world(on)
+  await start($, clock)
+  mode.codex = 'fail'
+  await clock.advance(7 * MIN)
+  expect(await wide($)).toContain('Codex — 실패')
 })

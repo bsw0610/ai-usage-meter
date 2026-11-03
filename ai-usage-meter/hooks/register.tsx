@@ -9,6 +9,7 @@ import { pullFromStore, put, refreshDue } from './readings'
 const TICK_MS = 30_000
 
 const readings = { plugin: 'ai-usage-meter', key: 'readings' } as const
+const attempts = { plugin: 'ai-usage-meter', key: 'attempts' } as const
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
@@ -38,7 +39,8 @@ export const register: Register = on => {
     if (e.props.hasSurvey) return rest
 
     const { value = {} } = await $.state.get(readings)
-    const rows = rowsFor(providers, value, await $.clock.now(), e.props.bodyColumns, e.props.maxRows)
+    const { value: lastAttempts = {} } = await $.state.get(attempts)
+    const rows = rowsFor(providers, value, await $.clock.now(), e.props.bodyColumns, e.props.maxRows, lastAttempts)
     const widths = columnWidths(rows)
     const { Box, Text } = $.ui.resolve(e)
     const textOf = (text: string, color?: 'warning' | 'error') =>

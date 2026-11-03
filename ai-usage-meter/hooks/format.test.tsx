@@ -290,6 +290,30 @@ test('each limit is colored on its own', () => {
   expect(formatRows([{ label: 'A', reading: both(82, 3.116 * HOUR, 46, 45 * HOUR) }], NOW)[0]!.map(c => c.color)).toEqual(['warning', undefined])
 })
 
+test('a dash says why at the widths that have room', () => {
+  const list = [{ id: 'a', label: 'Alpha', short: 'A' }]
+  const old = { a: { kind: 'percent' as const, percent: 9, observedAt: NOW - HOUR } }
+  const failed = { a: { at: NOW, isOk: false } }
+  const missing = { a: { at: NOW, isOk: false, isMissing: true } }
+  const ok = { a: { at: NOW, isOk: true } }
+  const at = (readings: any, attempts?: any, columns = Infinity) => lineFor(list, readings, NOW, columns, Infinity, attempts)
+
+  expect(at({})).toBe('Alpha —') // 아직 결과가 없다
+  expect(at({}, ok)).toBe('Alpha —') // 첫 조회 중
+  expect(at({}, failed)).toBe('Alpha — 실패')
+  expect(at({}, missing)).toBe('Alpha — 미설치')
+  expect(at(old, ok)).toBe('Alpha — 오래됨')
+  expect(at(old)).toBe('Alpha — 오래됨')
+  expect(at(old, failed)).toBe('Alpha — 실패')
+
+  // 유효한 값은 조회가 실패해도 그대로 그린다.
+  expect(at({ a: percent(9) }, failed)).toContain('9%')
+
+  // 칸이 모자라면 줄표만 남긴다.
+  expect(at({}, failed, displayWidth('Alpha —'))).toBe('Alpha —')
+  expect(at({}, failed, displayWidth('A —'))).toBe('A —')
+})
+
 test('a stored reading with no weekly limit still draws on one line', () => {
   const stored = { codex: { kind: 'percent' as const, percent: 60, resetsAt: NOW + HOUR, windowMs: 5 * HOUR, observedAt: NOW } }
   expect(lineFor(providers, stored, NOW)).toBe('Codex ━━━━━━──┃─ 60% (리셋 1h) · Gemini(AG) —')

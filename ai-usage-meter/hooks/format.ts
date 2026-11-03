@@ -1,7 +1,10 @@
-import type { PercentLimit, Reading } from '../types/index'
+import type { Attempt, PercentLimit, Reading } from '../types/index'
 import { DEFAULT_TTL_MS } from './providers/types'
 
-type Entry = { label: string; short?: string; reading: Reading | null | undefined }
+// 값을 그릴 수 없는 이유. 없으면 아직 결과가 없다는 뜻이다.
+type Trouble = 'failed' | 'missing' | 'stale'
+
+type Entry = { label: string; short?: string; reading: Reading | null | undefined; trouble?: Trouble }
 
 // 줄의 한 조각. color가 있으면 그 색으로, 없으면 흐리게 그린다.
 export type Part = { text: string; color?: 'warning' | 'error' }
@@ -25,6 +28,7 @@ const STEPS: Step[] = [
 ]
 
 const DASH = '—'
+const TROUBLE_TEXT: Record<Trouble, string> = { failed: '실패', missing: '미설치', stale: '오래됨' }
 const BAR_CELLS = 10
 // 이보다 적게 썼으면 표본이 작아 소진을 예측하지 않는다.
 const MIN_PERCENT_TO_PROJECT = 20
@@ -147,7 +151,7 @@ function isMoreUrgent(a: PercentLimit, b: PercentLimit, observedAt: number, now:
 function cellsOf(e: Entry, now: number, step: Step, isStacked: boolean): Cell[] {
   const label = step.isShort ? (e.short ?? e.label) : e.label
   const r = e.reading
-  if (!r) return [{ label, value: DASH }]
+  if (!r) return [{ label, value: step.detail && e.trouble ? `${DASH} ${TROUBLE_TEXT[e.trouble]}` : DASH }]
   if (r.kind === 'count') {
     const count = shortCount(r.count)
     return [{ label, value: step.isShort ? count : `${count} ${r.unit}` }]
@@ -227,12 +231,16 @@ export function rowsFor(
   now = 0,
   columns = Infinity,
   maxRows = Infinity,
+  attempts: Record<string, Attempt> = {},
 ): Cell[][] {
   return formatRows(
     list.map(p => {
       const r = readings[p.id]
       const maxAge = p.maxAgeMs ?? 2 * (p.ttlMs ?? DEFAULT_TTL_MS)
-      return { label: p.label, short: p.short, reading: r && now - r.observedAt <= maxAge ? r : null }
+      if (r && now - r.observedAt <= maxAge) return { label: p.label, short: p.short, reading: r }
+      const last = attempts[p.id]
+      const trouble = last && !last.isOk ? (last.isMissing ? 'missing' : 'failed') : r ? 'stale' : undefined
+      return { label: p.label, short: p.short, reading: null, ...(trouble ? { trouble } : {}) }
     }),
     now,
     columns,

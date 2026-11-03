@@ -1,19 +1,27 @@
+import type { ProcessRunResult } from 'claude-code'
+
 import type { Reading } from '../../types/index'
 import { parseLive, parseRollout } from './codex-parse'
+import { ReadFailure } from './types'
 import type { Io, Provider } from './types'
 
 const TAIL_BYTES = 262144
 const MAX_FILES = 5
 const LIVE_TIMEOUT_MS = 5000
+const EXIT_NO_CODEX = 2 // scripts/codex-limits.mjs: codex 명령이 없다
 
 // 1순위: codex app-server에 직접 묻는 헬퍼.
-async function readLive(io: Io, now: number): Promise<Reading | undefined> {
+async function readLive(io: Io, now: number): Promise<Reading> {
+  let r: ProcessRunResult
   try {
-    const r = await io.run(['node', `${io.root}/scripts/codex-limits.mjs`], { timeoutMs: LIVE_TIMEOUT_MS })
-    return r.exitCode === 0 ? parseLive(r.stdout, now) : undefined
-  } catch {
-    return undefined
+    r = await io.run(['node', `${io.root}/scripts/codex-limits.mjs`], { timeoutMs: LIVE_TIMEOUT_MS })
+  } catch (e) {
+    throw new ReadFailure(`helper: ${e instanceof Error ? e.message : String(e)}`)
   }
+  if (r.exitCode !== 0) throw new ReadFailure(`helper exit ${r.exitCode}: ${r.stderr.trim()}`, r.exitCode === EXIT_NO_CODEX)
+  const reading = parseLive(r.stdout, now)
+  if (!reading) throw new ReadFailure('helper: 출력 모양이 다름')
+  return reading
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -67,6 +75,14 @@ export const codex: Provider = {
   short: 'Cx',
   read: async io => {
     const now = await io.now()
-    return (await readLive(io, now)) ?? (await readLog(io, now)) ?? null
+    let live: ReadFailure
+    try {
+      return await readLive(io, now)
+    } catch (e) {
+      live = e as ReadFailure
+    }
+    const log = await readLog(io, now)
+    if (log) return log
+    throw new ReadFailure(`${live.message}; log: ${log === null ? 'rate_limits 없음' : 'token_count 없음'}`, live.isMissing)
   },
 }

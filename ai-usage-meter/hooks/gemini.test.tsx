@@ -1,5 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
+import { gemini } from './providers/gemini'
 import { parseUsage } from './providers/gemini-parse'
 
 // 픽스처는 직접 만든 가짜 값이다. 탭 구분.
@@ -64,6 +65,23 @@ for (const run of ['exit1', 'throw', 'garbage', 'login'] as const) {
     expect(await shown($, clock)).toBe('Gemini(AG) —')
   })
 }
+
+test('the reason agy failed comes with the failure, and a missing agy says so', async () => {
+  const io = (run: () => Promise<unknown>) => ({ run, now: async () => NOW }) as any
+  const failure = (run: () => Promise<unknown>) => gemini.read(io(run)).catch((e: any) => e)
+
+  const missing = await failure(() => Promise.reject(new Error('spawn agy ENOENT')))
+  expect([missing.message, missing.isMissing]).toEqual(['agy: spawn agy ENOENT', true])
+
+  const late = await failure(() => Promise.reject(new Error('aborted: still running after 15000ms')))
+  expect([late.message, late.isMissing]).toEqual(['agy: aborted: still running after 15000ms', false])
+
+  const exited = await failure(async () => ({ exitCode: 3, stdout: '', stderr: ' no session\n' }))
+  expect([exited.message, exited.isMissing]).toEqual(['agy exit 3: no session', false])
+
+  const login = await failure(async () => ({ exitCode: 0, stdout: 'Please sign in\n', stderr: '' }))
+  expect([login.message, login.isMissing]).toEqual(['agy: 한도 줄 없음: Please sign in', false])
+})
 
 test('a failing agy does not blank Codex', async ($, on) => {
   const { clock } = world(on, 'throw')

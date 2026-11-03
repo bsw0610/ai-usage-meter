@@ -6,6 +6,15 @@ export type { Reading }
 
 export const DEFAULT_TTL_MS = 3 * 60_000
 
+// read가 실패를 알리는 방법. 이유는 조회 기록에 남는다.
+export class ReadFailure extends Error {
+  readonly isMissing: boolean
+  constructor(message: string, isMissing = false) {
+    super(message)
+    this.isMissing = isMissing
+  }
+}
+
 // provider가 쓰는 바깥 세계. `$`는 정적 검사 때문에 인자로 넘길 수 없어서,
 // 호출 지점에서 `$.noun.event(...)`로 풀어 쓴 함수만 넘긴다(readings.ts의 makeIo).
 export type Io = {
@@ -22,7 +31,7 @@ export type Provider = {
   id: string
   label: string
   short: string
-  // null이면 "—"
+  // 실패하면 ReadFailure를 던진다. null은 이유 없이 값을 모른다는 뜻이다.
   read: (io: Io) => Promise<Reading | null>
   // 조회 간격(기본 3분)과 실패한 뒤 다시 시도하기까지의 간격(기본은 조회 간격과 같음).
   ttlMs?: number

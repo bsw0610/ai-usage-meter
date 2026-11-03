@@ -1,7 +1,7 @@
 import type { EngineInterface } from 'claude-code'
 
 import type { Attempt, PercentLimit, Reading } from '../types/index'
-import { DEFAULT_TTL_MS } from './providers/types'
+import { DEFAULT_TTL_MS, ReadFailure } from './providers/types'
 import type { Io, Provider } from './providers/types'
 
 type Readings = Record<string, Reading | null>
@@ -13,6 +13,7 @@ const attemptsRef = { plugin: 'ai-usage-meter', key: 'attempts' } as const
 // Reading의 모양이 바뀌면 키의 버전을 올려 서로 섞이지 않게 한다.
 const STORE_KEY = 'readings-v3'
 const ATTEMPTS_KEY = 'attempts-v3'
+const MAX_ERROR_CHARS = 200
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -48,7 +49,14 @@ async function storedAttempts($: EngineInterface): Promise<Attempts> {
   if (!isRecord(saved)) return out
   for (const [id, v] of Object.entries(saved)) {
     if (typeof v === 'number') out[id] = { at: v, isOk: true }
-    else if (isRecord(v) && typeof v.at === 'number') out[id] = { at: v.at, isOk: v.isOk !== false }
+    else if (isRecord(v) && typeof v.at === 'number') {
+      out[id] = {
+        at: v.at,
+        isOk: v.isOk !== false,
+        ...(typeof v.error === 'string' ? { error: v.error } : {}),
+        ...(v.isMissing === true ? { isMissing: true } : {}),
+      }
+    }
   }
   return out
 }
@@ -116,10 +124,10 @@ function makeIo($: EngineInterface): Io {
   }
 }
 
-async function markAttempts($: EngineInterface, ids: string[], attempt: Attempt): Promise<void> {
+async function markAttempts($: EngineInterface, updates: Attempts): Promise<void> {
   for (let i = 0; i < 5; i++) {
     const { value = {}, version } = await $.state.get(attemptsRef)
-    const next = { ...value, ...Object.fromEntries(ids.map(id => [id, attempt])) }
+    const next = { ...value, ...updates }
     const { isSet } = await $.state.set(attemptsRef, next, { ifVersion: version })
     if (isSet) {
       await $.store.set(ATTEMPTS_KEY, mergeAttempts(next, await storedAttempts($)))
@@ -145,13 +153,20 @@ export async function refreshDue($: EngineInterface, list: Provider[]): Promise<
   })
   if (due.length === 0) return
 
-  await markAttempts($, due.map(p => p.id), { at: now, isOk: true }) // 조회 전에 기록해 겹치는 조회를 막는다
+  // 조회 전에 기록해 겹치는 조회를 막는다. 직전 실패는 결과가 나올 때까지 그대로 둔다.
+  await markAttempts($, Object.fromEntries(due.map(p => [p.id, { isOk: true, ...attempts[p.id], at: now }])))
   await Promise.all(
     due.map(async p => {
-      const reading = await p.read(io).catch(() => null)
-      // observedAt은 읽어 온 시각이다. 오래된 로그의 값도 지금 읽었으면 수명이 새로 시작한다.
-      if (reading) await put($, p.id, { ...reading, observedAt: now })
-      else await markAttempts($, [p.id], { at: now, isOk: false })
+      try {
+        const reading = await p.read(io)
+        if (!reading) throw new ReadFailure('값 없음')
+        // observedAt은 읽어 온 시각이다. 오래된 로그의 값도 지금 읽었으면 수명이 새로 시작한다.
+        await put($, p.id, { ...reading, observedAt: now })
+        await markAttempts($, { [p.id]: { at: now, isOk: true } })
+      } catch (e) {
+        const error = (e instanceof Error ? e.message : String(e)).slice(0, MAX_ERROR_CHARS)
+        await markAttempts($, { [p.id]: { at: now, isOk: false, error, ...(e instanceof ReadFailure && e.isMissing ? { isMissing: true } : {}) } })
+      }
     }),
   )
 }

@@ -7,8 +7,9 @@ export type Reading =
   | (PercentLimit & { kind: 'percent'; observedAt: number; secondary?: PercentLimit })
   | { kind: 'count'; count: number; unit: string; observedAt: number }
 
-// at: epoch milliseconds
-export type Attempt = { at: number; isOk: boolean }
+// at: epoch milliseconds. error: 실패 이유(저장 파일에서 읽는 진단용으로, 밴드에는 그리지 않는다).
+// isMissing: 조회에 필요한 프로그램이 설치돼 있지 않다.
+export type Attempt = { at: number; isOk: boolean; error?: string; isMissing?: boolean }
 
 declare module 'claude-code' {
   interface PluginState {
