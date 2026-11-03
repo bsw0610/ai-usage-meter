@@ -80,7 +80,7 @@ export const BAR_HEIGHT_PX = 12
 
 // Svg는 이미지로 그려져 테마 색을 받지 못하므로, 밝은 화면과 어두운 화면 모두에서 보이는 중간 색을 쓴다.
 const BAR_COLORS = { error: '#dc2626' }
-const BAR_NEUTRAL = '#8c8c8c'
+const BAR_FILL = '#2c84db' // Claude 앱의 파란 강조색(--accent-100). 밝은 화면과 어두운 화면에서 값이 같다.
 const BAR_TRACK = 'rgba(140,140,140,0.3)'
 const BAR_INSET_PX = 2
 
@@ -90,7 +90,7 @@ export function barSvg({ percent }: Bar, color?: Part['color']): string {
   const at = (ratio: number) => (BAR_INSET_PX + Math.min(1, Math.max(0, ratio)) * (BAR_WIDTH_PX - 2 * BAR_INSET_PX)).toFixed(2)
   const line = (x1: string, x2: string, stroke: string) =>
     `<line x1="${x1}" y1="${mid}" x2="${x2}" y2="${mid}" stroke="${stroke}" stroke-width="3" stroke-linecap="round"/>`
-  const fill = percent > 0 ? line(at(0), at(percent / 100), color ? BAR_COLORS[color] : BAR_NEUTRAL) : ''
+  const fill = percent > 0 ? line(at(0), at(percent / 100), color ? BAR_COLORS[color] : BAR_FILL) : ''
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${BAR_WIDTH_PX}" height="${BAR_HEIGHT_PX}" viewBox="0 0 ${BAR_WIDTH_PX} ${BAR_HEIGHT_PX}">${line(at(0), at(1), BAR_TRACK)}${fill}</svg>`
 }
 

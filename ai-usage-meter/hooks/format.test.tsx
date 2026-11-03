@@ -131,6 +131,13 @@ test('the line moves with the value, with no steps', () => {
   expect(barSvg({ percent: 50 })).not.toContain('<rect')
 })
 
+test('the used line is blue, and red once the limit is used up', () => {
+  expect(barSvg({ percent: 50 })).toContain('stroke="#2c84db"')
+  expect(barSvg({ percent: 0 })).not.toContain('#2c84db')
+  expect(barSvg({ percent: 100 }, 'error')).toContain('stroke="#dc2626"')
+  expect(barSvg({ percent: 100 }, 'error')).not.toContain('#2c84db')
+})
+
 test('the bar is only the used line, and says what it shows', () => {
   expect(barSvg({ percent: 50 })).not.toContain('y1="1"')
   expect(barAlt({ percent: 51.4 })).toBe('51% 사용')
