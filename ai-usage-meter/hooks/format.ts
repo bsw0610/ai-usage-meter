@@ -27,6 +27,7 @@ const STEPS: Step[] = [
 ]
 
 const DASH = '—'
+const RED_FROM_PERCENT = 90
 const TROUBLE_TEXT: Record<Trouble, string> = { failed: '실패', missing: '미설치', stale: '오래됨' }
 const BAR_CELLS = 10
 
@@ -110,7 +111,7 @@ function limitCell(r: PercentLimit, now: number, step: Step): Omit<Cell, 'label'
   return {
     ...(step.hasBar ? { bar: { percent: r.percent } } : {}),
     value: tail ? `${percent} ${tail}` : percent,
-    ...(r.percent >= 100 ? { color: 'error' as const } : {}),
+    ...(r.percent >= RED_FROM_PERCENT ? { color: 'error' as const } : {}),
   }
 }
 

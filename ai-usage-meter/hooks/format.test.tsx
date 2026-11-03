@@ -116,9 +116,12 @@ test('the bar keeps ten cells', () => {
   expect(one(percent(0, HOUR))).toBe('A ────────── 0% (리셋 1h)')
 })
 
-test('short of a full window, however fast: shows the reset, with no color', () => {
-  expect(one(percent(99, 4.9 * HOUR))).toBe('A ━━━━━━━━━╸ 99% (리셋 4h54m)')
-  expect(colorOf(percent(99, 4.9 * HOUR))).toBeUndefined()
+test('the color turns red from 90%, not before', () => {
+  expect(colorOf(percent(89, HOUR))).toBeUndefined()
+  expect(colorOf(percent(89.9, HOUR))).toBeUndefined()
+  expect(colorOf(percent(90, HOUR))).toBe('error')
+  expect(colorOf(percent(99, HOUR))).toBe('error')
+  expect(colorOf(percent(95, -HOUR))).toBeUndefined() // 리셋이 지난 창은 0%다
 })
 
 test('the line moves with the value, with no steps', () => {
