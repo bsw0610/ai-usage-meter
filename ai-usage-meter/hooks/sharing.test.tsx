@@ -240,7 +240,7 @@ test('when the value stands still the warning goes, and it returns once the valu
   expect(await wide()).toContain('뒤 소진')
 
   await clock.advance(20 * MIN)
-  expect(await wide()).toContain('80% (리셋 3h)')
+  expect(await wide()).toContain('80% (리셋 2h40m)')
 
   mode.live = JSON.stringify({ limitId: 'codex', windows: [{ usedPercent: 85, windowDurationMins: 300, resetsAt: SEC + 10_800 }] })
   await clock.advance(3 * MIN)

@@ -53,6 +53,22 @@ test('the reset reads in minutes, hours or days', () => {
   expect(at(5 * 24 * HOUR)).toBe('A ╸───────── 1% (리셋 5d)')
 })
 
+test('with room, a time under a day reads to the minute; a narrow line keeps whole hours', () => {
+  const MINUTE = 60_000
+  const left = (ms: number, columns?: number) => one(percent(30, ms), columns)
+  expect(left(2 * HOUR + 32 * MINUTE)).toBe('A ━━━─────── 30% (리셋 2h32m)')
+  expect(left(2 * HOUR)).toBe('A ━━━─────── 30% (리셋 2h)')
+  expect(left(59 * MINUTE)).toBe('A ━━━─────── 30% (리셋 59m)')
+  expect(left(23 * HOUR + 59 * MINUTE)).toBe('A ━━━─────── 30% (리셋 23h59m)')
+  expect(left(45 * HOUR)).toBe('A ━━━─────── 30% (리셋 45h)')
+  expect(left(2 * HOUR + 32 * MINUTE, displayWidth('A ━━━─────── 30% 3h'))).toBe('A ━━━─────── 30% 3h')
+
+  const fast = windowed(60, 3 * HOUR + 30 * MINUTE) // 1시간 30분에 60%, 소진까지 1시간
+  expect(one(fast)).toContain('약 1h 뒤 소진')
+  const faster = windowed(55, 3 * HOUR + 30 * MINUTE) // 1시간 30분에 55%, 소진까지 약 1시간 14분
+  expect(one(faster)).toContain('약 1h14m 뒤 소진')
+})
+
 test('a passed reset shows 0% and no reset', () => {
   expect(formatLine([{ label: 'A', reading: percent(80, -HOUR) }], NOW)).toBe('A ────────── 0%')
   expect(formatLine([{ label: 'A', reading: { ...percent(80, -HOUR), windowMs: 5 * HOUR } }], NOW)).toBe('A ────────── 0%')
@@ -169,7 +185,7 @@ test('the time tick moves with the clock, and the bar says what it shows', () =>
 test('a projection already past is dropped, since the value is stale', () => {
   // 40분 전에 읽은 값: 그때 기준 약 20분 뒤 소진이었으니 예측 시각이 지났다.
   const stale = windowed(80, 3.33 * HOUR, 5 * HOUR, NOW - (2 * HOUR) / 3)
-  expect(one(stale)).toContain('(리셋 3h)')
+  expect(one(stale)).toContain('(리셋 3h20m)')
   expect(colorOf(stale)).toBeUndefined()
 })
 
