@@ -107,8 +107,8 @@ test('a failed Gemini is not retried for thirty minutes; Codex keeps its three',
 
 test('a recent attempt from an earlier session is respected on a new start', async ($, on) => {
   const { clock, calls } = world(on, { codex: 'ok', agy: 'ok' }, {
-    attempts: { codex: NOW - MIN, gemini: NOW - MIN },
-    readings: { codex: { kind: 'percent', percent: 9, observedAt: NOW - MIN }, gemini: null },
+    'attempts-v2': { codex: NOW - MIN, gemini: NOW - MIN },
+    'readings-v2': { codex: { kind: 'percent', percent: 9, observedAt: NOW - MIN }, gemini: null },
   })
   await start($, clock)
   expect(calls).toEqual({ node: 0, agy: 0 })
@@ -116,7 +116,7 @@ test('a recent attempt from an earlier session is respected on a new start', asy
 })
 
 test('after the three minutes of an old attempt the source is queried', async ($, on) => {
-  const { clock, calls } = world(on, { codex: 'ok', agy: 'ok' }, { attempts: { codex: NOW - 4 * MIN, gemini: NOW - 16 * MIN } })
+  const { clock, calls } = world(on, { codex: 'ok', agy: 'ok' }, { 'attempts-v2': { codex: NOW - 4 * MIN, gemini: NOW - 16 * MIN } })
   await start($, clock)
   expect(calls).toEqual({ node: 1, agy: 1 })
 })

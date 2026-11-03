@@ -1,21 +1,24 @@
-import type { Reading } from '../../types/index'
+import type { PercentLimit, Reading } from '../../types/index'
 
 const FIVE_HOURS = 300
 const SEVEN_DAYS = 10080
 
 export type Window = { usedPercent: number; minutes: number; resetsAtSec: number | undefined }
 
-// 5시간 창 우선, 없으면 7일 창. 창 이름(primary/secondary)이 아니라 길이로 구분한다.
+const toLimit = (w: Window): PercentLimit => ({
+  percent: w.usedPercent,
+  windowMs: w.minutes * 60_000,
+  ...(typeof w.resetsAtSec === 'number' ? { resetsAt: w.resetsAtSec * 1000 } : {}),
+})
+
+// 5시간 창 우선, 없으면 7일 창. 둘 다 있으면 7일 창은 secondary로 함께 담는다.
+// 창 이름(primary/secondary)이 아니라 길이로 구분한다.
 export function fromWindows(windows: Window[], observedAt: number): Reading | undefined {
-  const w = windows.find(x => x.minutes === FIVE_HOURS) ?? windows.find(x => x.minutes === SEVEN_DAYS)
+  const five = windows.find(x => x.minutes === FIVE_HOURS)
+  const week = windows.find(x => x.minutes === SEVEN_DAYS)
+  const w = five ?? week
   if (!w) return undefined
-  return {
-    kind: 'percent',
-    percent: w.usedPercent,
-    windowMs: w.minutes * 60_000,
-    ...(typeof w.resetsAtSec === 'number' ? { resetsAt: w.resetsAtSec * 1000 } : {}),
-    observedAt,
-  }
+  return { kind: 'percent', ...toLimit(w), ...(five && week ? { secondary: toLimit(week) } : {}), observedAt }
 }
 
 const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x)

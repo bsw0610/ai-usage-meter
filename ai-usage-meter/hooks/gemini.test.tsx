@@ -81,3 +81,18 @@ test('parseUsage: weekly is the fallback, remaining becomes used, other groups a
   expect(parseUsage(row('Claude and GPT models', 'Five Hour Limit Remaining', '10%', 'x'), NOW)).toBeUndefined()
   expect(parseUsage(row('Gemini Models', 'Five Hour Limit Remaining', '100%', 'bad'), NOW)).toEqual({ kind: 'percent', percent: 0, windowMs: 5 * 3_600_000, observedAt: NOW })
 })
+
+test('parseUsage: with both limits, the weekly one comes along as used percent', () => {
+  const text = [
+    row('Gemini Models', 'Weekly Limit Remaining', '90%', '2026-11-10T00:00:00Z'),
+    row('Gemini Models', 'Five Hour Limit Remaining', '75%', '2026-11-04T13:00:00Z'),
+  ].join('\n')
+  expect(parseUsage(text, NOW)).toEqual({
+    kind: 'percent',
+    percent: 25,
+    windowMs: 5 * 3_600_000,
+    resetsAt: Date.parse('2026-11-04T13:00:00Z'),
+    secondary: { percent: 10, windowMs: 7 * 86_400_000, resetsAt: Date.parse('2026-11-10T00:00:00Z') },
+    observedAt: NOW,
+  })
+})

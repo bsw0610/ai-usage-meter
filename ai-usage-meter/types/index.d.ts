@@ -1,6 +1,9 @@
-// resetsAt, observedAt: epoch milliseconds. windowMs: 한도 창의 길이(모르면 없음, 페이스를 계산하지 않는다)
+// resetsAt: epoch milliseconds. windowMs: 한도 창의 길이(모르면 없음, 페이스를 계산하지 않는다)
+export type PercentLimit = { percent: number; resetsAt?: number; windowMs?: number }
+
+// observedAt: epoch milliseconds. secondary: 5시간 한도와 함께 오는 주간 한도
 export type Reading =
-  | { kind: 'percent'; percent: number; resetsAt?: number; windowMs?: number; observedAt: number }
+  | (PercentLimit & { kind: 'percent'; observedAt: number; secondary?: PercentLimit })
   | { kind: 'count'; count: number; unit: string; observedAt: number }
 
 // at: epoch milliseconds

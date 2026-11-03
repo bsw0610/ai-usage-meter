@@ -41,7 +41,7 @@ const BAND = {
   plugin: 'ai-usage-meter',
   component: 'AbovePrompt',
   requestId: 'band',
-  props: { hasSurvey: false, isWorking: false, bodyColumns: 24, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
+  props: { hasSurvey: false, isWorking: false, bodyColumns: 25, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
 } as const
 
 // 세션을 시작해 첫 조회를 돌리고, 밴드에 보이는 Codex 값을 돌려준다.
@@ -51,7 +51,7 @@ async function shown($: any, clock: { settle: () => Promise<void> }, surface: 't
   const ui = await $.ui.mount({ ...BAND, surface })
   const text: string | undefined = (await ui.find({ type: 'Text', text: /Codex/ }))?.text
   await ui.unmount()
-  return text?.split(' · ')[0]
+  return text?.split(' · ')[0]?.replace(/ +/g, ' ')
 }
 
 function world(on: any, s: Setup = {}) {
@@ -179,4 +179,14 @@ test('the newest file without a token_count is passed over', async ($, on) => {
 test('parseRollout: nothing found is undefined, not null', () => {
   expect(parseRollout('')).toBeUndefined()
   expect(parseRollout(JSON.stringify({ type: 'event_msg', payload: { type: 'other' } }))).toBeUndefined()
+})
+
+test('both windows are carried, and one alone stays the only limit', () => {
+  const five = win(31, 300, 7200)
+  const week = win(44, 10080, 200000)
+  const both = parseRollout(tokenCount(limits(five, week)))
+  expect(both).toMatchObject({ percent: 31, windowMs: 300 * 60_000, secondary: { percent: 44, windowMs: 10080 * 60_000, resetsAt: (SEC + 200000) * 1000 } })
+  const alone = parseRollout(tokenCount(limits(week, null)))
+  expect(alone).toMatchObject({ percent: 44, windowMs: 10080 * 60_000 })
+  expect(alone && 'secondary' in alone).toBe(false)
 })

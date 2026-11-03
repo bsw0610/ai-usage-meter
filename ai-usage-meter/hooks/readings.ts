@@ -9,8 +9,10 @@ type Attempts = Record<string, Attempt>
 
 const ref = { plugin: 'ai-usage-meter', key: 'readings' } as const
 const attemptsRef = { plugin: 'ai-usage-meter', key: 'attempts' } as const
-const STORE_KEY = 'readings'
-const ATTEMPTS_KEY = 'attempts'
+// 저장소는 열린 세션끼리 공유한다. 이전 코드로 도는 세션은 새 필드를 모른 채 값을 덮어쓰므로,
+// Reading의 모양이 바뀌면 키의 버전을 올려 서로 섞이지 않게 한다.
+const STORE_KEY = 'readings-v2'
+const ATTEMPTS_KEY = 'attempts-v2'
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v)

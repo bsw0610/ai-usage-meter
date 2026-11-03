@@ -1,4 +1,4 @@
-import type { Reading } from '../types/index'
+import type { PercentLimit, Reading } from '../types/index'
 import { DEFAULT_TTL_MS } from './providers/types'
 
 type Entry = { label: string; short?: string; reading: Reading | null | undefined }
@@ -9,7 +9,7 @@ export type Part = { text: string; color?: 'warning' | 'error' }
 // 막대의 값. 창 길이를 모르면 시간 표시 없이 사용량만 그린다.
 export type Bar = { percent: number; elapsedMs?: number; windowMs?: number }
 
-// 소스 하나의 표시. Svg를 그리는 표면은 칸별로, 터미널은 한 줄로 합쳐 그린다.
+// 한도 하나의 표시. Svg를 그리는 표면은 칸별로, 터미널은 한 줄로 합쳐 그린다.
 export type Cell = { label: string; bar?: Bar; value: string; color?: Part['color'] }
 
 type Step = { hasBar?: boolean; detail?: 'full' | 'hours'; isShort?: boolean }
@@ -99,10 +99,10 @@ export function barAlt({ percent, elapsedMs, windowMs }: Bar): string {
 }
 
 // 관측 시점까지의 속도가 이어지면 리셋 전에 소진될 때, 지금부터 소진까지 남은 시간.
-function msToExhaust(r: Extract<Reading, { kind: 'percent' }>, now: number): number | undefined {
+function msToExhaust(r: PercentLimit, observedAt: number, now: number): number | undefined {
   if (r.windowMs === undefined || r.resetsAt === undefined) return undefined
   if (r.percent < MIN_PERCENT_TO_PROJECT || r.percent >= 100) return undefined
-  const elapsed = r.windowMs - (r.resetsAt - r.observedAt)
+  const elapsed = r.windowMs - (r.resetsAt - observedAt)
   if (elapsed <= 0) return undefined
   const fromStart = (elapsed * 100) / r.percent
   if (fromStart >= r.windowMs) return undefined
@@ -110,12 +110,7 @@ function msToExhaust(r: Extract<Reading, { kind: 'percent' }>, now: number): num
   return ms > 0 ? ms : undefined // 예측한 시각이 이미 지났으면 값이 낡은 것이다
 }
 
-function value(r: Reading | null | undefined, now: number, step: Step): Omit<Cell, 'label'> {
-  if (!r) return { value: DASH }
-  if (r.kind === 'count') {
-    const count = shortCount(r.count)
-    return { value: step.isShort ? count : `${count} ${r.unit}` }
-  }
+function limitCell(r: PercentLimit, observedAt: number, now: number, step: Step): Omit<Cell, 'label'> {
   const left = r.resetsAt === undefined ? undefined : r.resetsAt - now
   // 리셋 시각이 지난 창은 새 창이 열린 것이므로 0%.
   if (left !== undefined && left <= 0) return { ...(step.hasBar ? { bar: { percent: 0 } } : {}), value: '0%' }
@@ -123,7 +118,7 @@ function value(r: Reading | null | undefined, now: number, step: Step): Omit<Cel
   const hasWindow = r.windowMs !== undefined && left !== undefined && left <= r.windowMs
   const bar: Bar = { percent: r.percent, ...(hasWindow ? { elapsedMs: r.windowMs! - left!, windowMs: r.windowMs! } : {}) }
   const percent = `${Math.round(r.percent)}%`
-  const exhaust = msToExhaust(r, now)
+  const exhaust = msToExhaust(r, observedAt, now)
   const color = r.percent >= 100 ? 'error' : exhaust !== undefined ? 'warning' : undefined
   const tail =
     exhaust !== undefined
@@ -133,48 +128,102 @@ function value(r: Reading | null | undefined, now: number, step: Step): Omit<Cel
   return { ...(step.hasBar ? { bar } : {}), value: tail ? `${percent} ${tail}` : percent, ...(color ? { color } : {}) }
 }
 
-// 색이 없는 조각은 이어 붙여, 그릴 Text 수를 줄인다.
-export function partsOf(cells: Cell[]): Part[] {
+// 다 쓴 한도, 소진이 더 가까운 한도, 더 많이 쓴 한도 순으로 급하다.
+function isMoreUrgent(a: PercentLimit, b: PercentLimit, observedAt: number, now: number): boolean {
+  const score = (r: PercentLimit): [number, number] => {
+    if (r.resetsAt !== undefined && r.resetsAt <= now) return [Infinity, 0]
+    return [r.percent >= 100 ? -1 : (msToExhaust(r, observedAt, now) ?? Infinity), r.percent]
+  }
+  const [x, y] = [score(a), score(b)]
+  return x[0] !== y[0] ? x[0] < y[0] : x[1] > y[1]
+}
+
+// 소스 하나의 칸들. 나란히 놓을 수 없으면 더 급한 한도 하나만 남긴다.
+function cellsOf(e: Entry, now: number, step: Step, isStacked: boolean): Cell[] {
+  const label = step.isShort ? (e.short ?? e.label) : e.label
+  const r = e.reading
+  if (!r) return [{ label, value: DASH }]
+  if (r.kind === 'count') {
+    const count = shortCount(r.count)
+    return [{ label, value: step.isShort ? count : `${count} ${r.unit}` }]
+  }
+  const primary = { label, ...limitCell(r, r.observedAt, now, step) }
+  if (!r.secondary) return [primary]
+  const weekly = limitCell(r.secondary, r.observedAt, now, step)
+  const weeklyLabel = step.isShort ? '주' : '주간'
+  if (isStacked) return [primary, { label: weeklyLabel, ...weekly }]
+  return [isMoreUrgent(r.secondary, r, r.observedAt, now) ? { label: `${label} ${weeklyLabel}`, ...weekly } : primary]
+}
+
+// 여러 줄일 때 위아래가 맞도록, 칸 번호별로 이름과 값의 폭을 잰다.
+export type ColumnWidths = { label: number[]; value: number[] }
+
+export function columnWidths(rows: Cell[][]): ColumnWidths {
+  const widths: ColumnWidths = { label: [], value: [] }
+  for (const cells of rows) {
+    cells.forEach((c, j) => {
+      widths.label[j] = Math.max(widths.label[j] ?? 0, displayWidth(c.label))
+      widths.value[j] = Math.max(widths.value[j] ?? 0, displayWidth(c.value))
+    })
+  }
+  return widths
+}
+
+const padTo = (text: string, width = 0) => text + ' '.repeat(Math.max(0, width - displayWidth(text)))
+
+// 색이 없는 조각은 이어 붙여, 그릴 Text 수를 줄인다. 줄 끝의 값은 채우지 않는다.
+export function partsOf(cells: Cell[], widths: ColumnWidths = columnWidths([cells])): Part[] {
   const parts: Part[] = []
   const add = (p: Part) => {
     const last = parts.at(-1)
     if (last && !last.color && !p.color) last.text += p.text
     else parts.push({ ...p })
   }
-  cells.forEach((c, i) => {
-    add({ text: `${i ? ' · ' : ''}${c.label} ` })
-    add({ text: c.bar ? `${barText(c.bar)} ${c.value}` : c.value, ...(c.color ? { color: c.color } : {}) })
+  cells.forEach((c, j) => {
+    const value = j < cells.length - 1 ? padTo(c.value, widths.value[j]) : c.value
+    add({ text: `${j ? ' · ' : ''}${padTo(c.label, widths.label[j])} ` })
+    add({ text: c.bar ? `${barText(c.bar)} ${value}` : value, ...(c.color ? { color: c.color } : {}) })
   })
   return parts
 }
 
 const textOf = (parts: Part[]) => parts.map(p => p.text).join('')
 
-function render(entries: Entry[], now: number, step: Step): Cell[] {
-  return entries.map(e => ({ label: step.isShort ? (e.short ?? e.label) : e.label, ...value(e.reading, now, step) }))
+function render(entries: Entry[], now: number, step: Step, isStacked: boolean): Cell[][] {
+  const cells = entries.map(e => cellsOf(e, now, step, isStacked))
+  return isStacked ? cells : [cells.flat()]
 }
 
-// 소스 이름을 모른 채 쌍들만 한 줄로 만든다. columns 칸에 들어가는 가장 자세한 단계를 고른다.
-export function formatCells(entries: Entry[], now = 0, columns = Infinity): Cell[] {
+// 소스 이름을 모른 채 쌍들을 줄로 만든다. 주간 한도까지 온 소스가 있고 maxRows가 허락하면 소스마다 한 줄,
+// 아니면 모두 한 줄이다. columns 칸에 들어가는 가장 자세한 단계를 고른다.
+export function formatRows(entries: Entry[], now = 0, columns = Infinity, maxRows = Infinity): Cell[][] {
+  const isStacked = entries.length <= maxRows && entries.some(e => e.reading?.kind === 'percent' && e.reading.secondary)
   for (const step of STEPS) {
-    const cells = render(entries, now, step)
-    if (displayWidth(textOf(partsOf(cells))) <= columns) return cells
+    const rows = render(entries, now, step, isStacked)
+    const widths = columnWidths(rows)
+    if (rows.every(cells => displayWidth(textOf(partsOf(cells, widths))) <= columns)) return rows
   }
-  return render(entries, now, STEPS[STEPS.length - 1]!)
+  return render(entries, now, STEPS[STEPS.length - 1]!, isStacked)
 }
 
-export const formatParts = (entries: Entry[], now = 0, columns = Infinity) => partsOf(formatCells(entries, now, columns))
-export const formatLine = (entries: Entry[], now = 0, columns = Infinity) => textOf(formatParts(entries, now, columns))
+const lineOf = (rows: Cell[][]) => {
+  const widths = columnWidths(rows)
+  return rows.map(cells => textOf(partsOf(cells, widths))).join('\n')
+}
 
-// 등록된 목록과 저장된 readings를 합쳐 한 줄로. 목록이 무엇이든 상관없다.
+export const formatLine = (entries: Entry[], now = 0, columns = Infinity, maxRows = Infinity) =>
+  lineOf(formatRows(entries, now, columns, maxRows))
+
+// 등록된 목록과 저장된 readings를 합쳐 줄로. 목록이 무엇이든 상관없다.
 // 수명(기본은 조회 간격의 2배)이 지난 값은 없는 값으로 그린다.
-export function cellsFor(
+export function rowsFor(
   list: { id: string; label: string; short?: string; ttlMs?: number; maxAgeMs?: number }[],
   readings: Record<string, Reading | null>,
   now = 0,
   columns = Infinity,
-): Cell[] {
-  return formatCells(
+  maxRows = Infinity,
+): Cell[][] {
+  return formatRows(
     list.map(p => {
       const r = readings[p.id]
       const maxAge = p.maxAgeMs ?? 2 * (p.ttlMs ?? DEFAULT_TTL_MS)
@@ -182,7 +231,8 @@ export function cellsFor(
     }),
     now,
     columns,
+    maxRows,
   )
 }
 
-export const lineFor = (...args: Parameters<typeof cellsFor>) => textOf(partsOf(cellsFor(...args)))
+export const lineFor = (...args: Parameters<typeof rowsFor>) => lineOf(rowsFor(...args))

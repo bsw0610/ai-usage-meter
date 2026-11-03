@@ -112,9 +112,9 @@ test("another session's attempt and reading are taken up at the next tick", asyn
   // 다른 세션이 14분 뒤에 agy를 돌렸다.
   await clock.advance(14 * MIN)
   const at = NOW + 14 * MIN
-  store.attempts = { ...(store.attempts as object), gemini: { at, isOk: true } }
-  store.readings = {
-    ...(store.readings as object),
+  store['attempts-v2'] = { ...(store['attempts-v2'] as object), gemini: { at, isOk: true } }
+  store['readings-v2'] = {
+    ...(store['readings-v2'] as object),
     gemini: { kind: 'percent', percent: 40, resetsAt: at + 3_600_000, observedAt: at },
   }
 
@@ -128,13 +128,13 @@ test('a store write never brings back an older value from this session', async (
   await start($, clock)
 
   const later = NOW + 10 * 60 * MIN
-  store.readings = {
-    ...(store.readings as object),
+  store['readings-v2'] = {
+    ...(store['readings-v2'] as object),
     gemini: { kind: 'percent', percent: 40, resetsAt: later + 3_600_000, observedAt: later },
   }
   await clock.advance(3 * MIN + 30_000) // Codex만 다시 조회하고 저장소에 쓴다
 
-  expect((store.readings as any).gemini.percent).toBe(40)
+  expect((store['readings-v2'] as any).gemini.percent).toBe(40)
 })
 
 test('a failure keeps the last value through its lifetime, then a dash', async ($, on) => {
@@ -152,8 +152,8 @@ test('a failure keeps the last value through its lifetime, then a dash', async (
 
 test('a stored value past its lifetime is not shown on a new start', async ($, on) => {
   const { clock } = world(on, {
-    attempts: { codex: { at: NOW, isOk: true }, gemini: { at: NOW, isOk: true } },
-    readings: {
+    'attempts-v2': { codex: { at: NOW, isOk: true }, gemini: { at: NOW, isOk: true } },
+    'readings-v2': {
       codex: { kind: 'percent', percent: 9, observedAt: NOW - 7 * MIN },
       gemini: { kind: 'percent', percent: 9, observedAt: NOW - 29 * MIN },
     },
@@ -163,7 +163,7 @@ test('a stored value past its lifetime is not shown on a new start', async ($, o
 })
 
 test('an attempt stored as a bare number by an older version still counts', async ($, on) => {
-  const { clock, calls } = world(on, { attempts: { codex: NOW - MIN, gemini: NOW - MIN } })
+  const { clock, calls } = world(on, { 'attempts-v2': { codex: NOW - MIN, gemini: NOW - MIN } })
   await start($, clock)
   expect(calls.node).toBe(0)
   expect(calls.agy).toBe(0)
@@ -183,4 +183,18 @@ test('an old value read from the log just now is shown, not treated as expired',
     }) + '\n'
   await start($, clock)
   expect(await line($)).toBe('Codex 22% · Gemini(AG) 25%')
+})
+
+test('values an older version keeps writing are not read back', async ($, on) => {
+  // 이전 코드로 도는 세션이 쓴 값: 주간 한도가 없고, 조회 주기도 따로 돈다.
+  const old = {
+    readings: { codex: { kind: 'percent', percent: 99, resetsAt: NOW + 3_600_000, observedAt: NOW } },
+    attempts: { codex: { at: NOW, isOk: true }, gemini: { at: NOW, isOk: true } },
+  }
+  const { clock, calls, store } = world(on, old)
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await clock.settle()
+  expect(calls.node).toBe(1) // 이전 버전의 조회 기록에 막히지 않는다
+  expect((store['readings-v2'] as any).codex.percent).toBe(31)
+  expect(store.readings).toEqual(old.readings) // 이전 버전의 값도 건드리지 않는다
 })

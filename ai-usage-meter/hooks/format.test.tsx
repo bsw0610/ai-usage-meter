@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { barAlt, barSvg, displayWidth, formatLine, formatParts, lineFor } from './format'
+import { barAlt, barSvg, displayWidth, formatLine, formatRows, lineFor, partsOf } from './format'
 import { providers } from './providers'
 
 // 픽스처는 직접 만든 가짜 값이다.
@@ -91,7 +91,7 @@ const windowed = (p: number, resetIn: number, windowMs = 5 * HOUR, observedAt = 
   observedAt,
 })
 const one = (reading: any, columns?: number) => formatLine([{ label: 'A', short: 'a', reading }], NOW, columns)
-const colorOf = (reading: any) => formatParts([{ label: 'A', reading }], NOW).find(p => p.color)?.color
+const colorOf = (reading: any) => partsOf(formatRows([{ label: 'A', reading }], NOW)[0]!).find(p => p.color)?.color
 
 test('the bar marks the time gone by, and keeps ten cells', () => {
   expect(one(windowed(10, 4 * HOUR))).toBe('A ━─┃─────── 10% (리셋 4h)')
@@ -205,6 +205,83 @@ test('only the source running out is colored, and the line stays whole, on both 
     }
     await ui.unmount()
   }
+})
+
+// 방금 조회한 값과 같은 모양: 5시간 창은 빠르고 주간 창은 여유 있다.
+const both = (five: number, fiveLeft: number, week: number, weekLeft: number) => ({
+  ...windowed(five, fiveLeft),
+  secondary: { percent: week, resetsAt: NOW + weekLeft, windowMs: 7 * 24 * HOUR },
+})
+const DAY = 24 * HOUR
+
+test('each source gets its own row with both limits, and the columns line up', () => {
+  const list = [
+    { label: 'Codex', short: 'Cx', reading: both(82, 3.116 * HOUR, 46, 45 * HOUR) },
+    { label: 'Gemini(AG)', short: 'AG', reading: both(25, 3 * HOUR, 10, 5 * DAY) },
+  ]
+  expect(formatLine(list, NOW).split('\n')).toEqual([
+    'Codex      ━━━┃━━━━── 82% 약 25m 뒤 소진 · 주간 ━━━━╸──┃── 46% (리셋 45h)',
+    'Gemini(AG) ━━╸─┃───── 25% (리셋 3h)      · 주간 ━─┃─────── 10% (리셋 5d)',
+  ])
+  const narrow = formatLine(list, NOW, 50).split('\n')
+  expect(narrow).toEqual(['Codex      82% 소진 25m · 주간 46% 45h', 'Gemini(AG) 25% 3h       · 주간 10% 5d'])
+  expect(formatLine(list, NOW, 10).split('\n')).toEqual(['Cx 82% · 주 46%', 'AG 25% · 주 10%'])
+})
+
+test('a source with one limit or none keeps its row, and nothing stacks without a weekly limit', () => {
+  const stacked = formatLine([
+    { label: 'Codex', reading: both(10, 4 * HOUR, 46, 45 * HOUR) },
+    { label: 'Gemini(AG)', reading: null },
+  ], NOW)
+  expect(stacked.split('\n')[1]).toBe('Gemini(AG) —')
+  expect(formatLine([{ label: 'A', reading: percent(1) }, { label: 'B', reading: null }], NOW)).toBe('A ╸───────── 1% · B —')
+})
+
+test('with room for one row, each source shows its more urgent limit', () => {
+  const line = (reading: any) => formatLine([{ label: 'A', reading }, { label: 'B', reading: null }], NOW, Infinity, 1)
+  expect(line(both(82, 3.116 * HOUR, 46, 45 * HOUR))).toContain('A ━━━┃━━━━── 82% 약 25m 뒤 소진') // 5시간 쪽이 빠르다
+  expect(line(both(10, 4 * HOUR, 95, 4 * DAY))).toContain('A 주간') // 주간 쪽이 더 많이 썼다
+  expect(line(both(100, 4 * HOUR, 95, 4 * DAY))).toContain('A ━━┃━━━━━━━ 100%') // 다 쓴 쪽이 먼저다
+  expect(line(both(10, 4 * HOUR, 100, 4 * DAY))).toContain('A 주간') // 주간을 다 쓰면 5시간 여유는 소용없다
+  expect(line(both(10, 4 * HOUR, 95, -HOUR))).not.toContain('주간') // 리셋이 지난 주간 창은 0%다
+})
+
+test('each limit is colored on its own', () => {
+  expect(formatRows([{ label: 'A', reading: both(10, 4 * HOUR, 100, 4 * DAY) }], NOW)[0]!.map(c => c.color)).toEqual([undefined, 'error'])
+  expect(formatRows([{ label: 'A', reading: both(82, 3.116 * HOUR, 46, 45 * HOUR) }], NOW)[0]!.map(c => c.color)).toEqual(['warning', undefined])
+})
+
+test('a stored reading with no weekly limit still draws on one line', () => {
+  const stored = { codex: { kind: 'percent' as const, percent: 60, resetsAt: NOW + HOUR, windowMs: 5 * HOUR, observedAt: NOW } }
+  expect(lineFor(providers, stored, NOW)).toBe('Codex ━━━━━━──┃─ 60% (리셋 1h) · Gemini(AG) —')
+})
+
+test('the band draws one row per source, on both surfaces', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  const value = { codex: both(82, 3.116 * HOUR, 46, 45 * HOUR), gemini: both(25, 3 * HOUR, 10, 5 * DAY) }
+  on('state.get', () => ({ value: { value, version: 0 } }))
+  on('ui.render', () => ({ type: 'engine', ref: 0 }))
+  const props = { hasSurvey: false, isWorking: false, bodyColumns: 100, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} }
+  const mount = (surface: 'terminal' | 'desktop', maxRows: number) =>
+    $.ui.mount({ plugin: 'ai-usage-meter', component: 'AbovePrompt', requestId: 'band', surface, props: { ...props, maxRows } })
+
+  const terminal = await mount('terminal', 5)
+  expect((await terminal.find({ type: 'Text', text: /^Codex/ }))?.text).toBe('Codex      ━━━┃━━━━── 82% 약 25m 뒤 소진 · 주간 ━━━━╸──┃── 46% (리셋 45h)')
+  expect((await terminal.find({ type: 'Text', text: /^Gemini/ }))?.text).toBe('Gemini(AG) ━━╸─┃───── 25% (리셋 3h)      · 주간 ━─┃─────── 10% (리셋 5d)')
+  await terminal.unmount()
+
+  const desktop = await mount('desktop', 5)
+  expect((await desktop.findAll({ type: 'Svg' })).map((b: any) => b.props.alt)).toEqual([
+    '82% 사용, 창의 38% 지남',
+    '46% 사용, 창의 73% 지남',
+    '25% 사용, 창의 40% 지남',
+    '10% 사용, 창의 29% 지남',
+  ])
+  await desktop.unmount()
+
+  const oneRow = await mount('desktop', 1)
+  expect(await oneRow.findAll({ type: 'Svg' })).toHaveLength(2)
+  await oneRow.unmount()
 })
 
 const LIVE = JSON.stringify({ limitId: 'codex', windows: [{ usedPercent: 18, windowDurationMins: 300, resetsAt: SEC + 7200 }] })
