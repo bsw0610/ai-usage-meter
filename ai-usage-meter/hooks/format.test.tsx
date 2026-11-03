@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { displayWidth, formatLine, lineFor } from './format'
+import { displayWidth, formatLine, formatParts, lineFor } from './format'
 import { providers } from './providers'
 
 // 픽스처는 직접 만든 가짜 값이다.
@@ -20,11 +20,16 @@ const entries = [
 ]
 
 test('the line narrows step by step as the room shrinks', () => {
+  const barFull = 'Codex ██░░░░░░░░ 18% (리셋 2h) · Gemini(AG) ███░░░░░░░ 25% (리셋 3h)'
+  const barHours = 'Codex ██░░░░░░░░ 18% 2h · Gemini(AG) ███░░░░░░░ 25% 3h'
   const full = 'Codex 18% (리셋 2h) · Gemini(AG) 25% (리셋 3h)'
   const hours = 'Codex 18% 2h · Gemini(AG) 25% 3h'
   const plain = 'Codex 18% · Gemini(AG) 25%'
   const short = 'Cx 18% · AG 25%'
-  expect(formatLine(entries, NOW)).toBe(full)
+  expect(formatLine(entries, NOW)).toBe(barFull)
+  expect(formatLine(entries, NOW, displayWidth(barFull))).toBe(barFull)
+  expect(formatLine(entries, NOW, displayWidth(barFull) - 1)).toBe(barHours)
+  expect(formatLine(entries, NOW, displayWidth(barHours) - 1)).toBe(full)
   expect(formatLine(entries, NOW, displayWidth(full))).toBe(full)
   expect(formatLine(entries, NOW, displayWidth(full) - 1)).toBe(hours)
   expect(formatLine(entries, NOW, displayWidth(hours))).toBe(hours)
@@ -42,14 +47,15 @@ test('Hangul counts as two cells, and the separators as one', () => {
 
 test('the reset reads in minutes, hours or days', () => {
   const at = (ms: number) => formatLine([{ label: 'A', reading: percent(1, ms) }], NOW)
-  expect(at(35 * 60_000)).toBe('A 1% (리셋 35m)')
-  expect(at(10_000)).toBe('A 1% (리셋 1m)')
-  expect(at(47 * HOUR)).toBe('A 1% (리셋 47h)')
-  expect(at(5 * 24 * HOUR)).toBe('A 1% (리셋 5d)')
+  expect(at(35 * 60_000)).toBe('A █░░░░░░░░░ 1% (리셋 35m)')
+  expect(at(10_000)).toBe('A █░░░░░░░░░ 1% (리셋 1m)')
+  expect(at(47 * HOUR)).toBe('A █░░░░░░░░░ 1% (리셋 47h)')
+  expect(at(5 * 24 * HOUR)).toBe('A █░░░░░░░░░ 1% (리셋 5d)')
 })
 
 test('a passed reset shows 0% and no reset', () => {
-  expect(formatLine([{ label: 'A', reading: percent(80, -HOUR) }], NOW)).toBe('A 0%')
+  expect(formatLine([{ label: 'A', reading: percent(80, -HOUR) }], NOW)).toBe('A ░░░░░░░░░░ 0%')
+  expect(formatLine([{ label: 'A', reading: { ...percent(80, -HOUR), windowMs: 5 * HOUR } }], NOW)).toBe('A ░░░░░░░░░░ 0%')
 })
 
 test('counts read short, and only the narrowest step drops the unit', () => {
@@ -74,9 +80,105 @@ test('a fourth provider narrows with the others', () => {
     fake: percent(50, HOUR),
   }
   expect(lineFor([...providers, fake], readings, NOW, 200)).toBe(
-    'Codex 18% (리셋 2h) · Gemini(AG) 25% (리셋 3h) · Fake 50% (리셋 1h)',
+    'Codex ██░░░░░░░░ 18% (리셋 2h) · Gemini(AG) ███░░░░░░░ 25% (리셋 3h) · Fake █████░░░░░ 50% (리셋 1h)',
   )
   expect(lineFor([...providers, fake], readings, NOW, 20)).toBe('Cx 18% · AG 25% · Fk 50%')
+})
+
+const windowed = (p: number, resetIn: number, windowMs = 5 * HOUR, observedAt = NOW) => ({
+  ...percent(p, resetIn),
+  windowMs,
+  observedAt,
+})
+const one = (reading: any, columns?: number) => formatLine([{ label: 'A', short: 'a', reading }], NOW, columns)
+const colorOf = (reading: any) => formatParts([{ label: 'A', reading }], NOW).find(p => p.color)?.color
+
+test('the bar marks the time gone by, and keeps ten cells', () => {
+  expect(one(windowed(10, 4 * HOUR))).toBe('A █░┃░░░░░░░ 10% (리셋 4h)')
+  expect(one(windowed(100, 30 * 60_000))).toBe('A █████████┃ 100% (리셋 30m)')
+  expect(one(percent(100, HOUR))).toBe('A ██████████ 100% (리셋 1h)')
+  expect(one(percent(99, HOUR))).toBe('A █████████░ 99% (리셋 1h)')
+  expect(one(percent(0, HOUR))).toBe('A ░░░░░░░░░░ 0% (리셋 1h)')
+})
+
+test('faster than the window lasts: says when it runs out, in the warning color', () => {
+  const fast = windowed(51, 4 * HOUR) // 5시간 창에서 1시간에 51%
+  expect(one(fast)).toBe('A ██┃██░░░░░ 51% 약 58m 뒤 소진')
+  expect(colorOf(fast)).toBe('warning')
+  expect(one(fast, displayWidth('A ██┃██░░░░░ 51% 소진 58m'))).toBe('A ██┃██░░░░░ 51% 소진 58m')
+  expect(one(fast, displayWidth('A 51% 약 58m 뒤 소진'))).toBe('A 51% 약 58m 뒤 소진')
+  expect(one(fast, displayWidth('A 51%'))).toBe('A 51%')
+  expect(one(fast, 1)).toBe('a 51%')
+})
+
+test('slower than the window lasts: shows the reset, with no color', () => {
+  const slow = windowed(30, 2 * HOUR) // 3시간에 30%
+  expect(one(slow)).toBe('A ███░░░┃░░░ 30% (리셋 2h)')
+  expect(colorOf(slow)).toBeUndefined()
+})
+
+test('the rate comes from when the value was read, not from now', () => {
+  // 30분 전에 읽은 값: 그때 5시간 창에서 1시간에 51%. 소진은 그로부터 약 58분 뒤라 지금부터 약 28분 뒤.
+  const old = windowed(51, 3.5 * HOUR, 5 * HOUR, NOW - HOUR / 2)
+  expect(one(old)).toContain('약 28m 뒤 소진')
+})
+
+test('a projection already past is dropped, since the value is stale', () => {
+  // 40분 전에 읽은 값: 그때 기준 약 20분 뒤 소진이었으니 예측 시각이 지났다.
+  const stale = windowed(80, 3.33 * HOUR, 5 * HOUR, NOW - (2 * HOUR) / 3)
+  expect(one(stale)).toContain('(리셋 3h)')
+  expect(colorOf(stale)).toBeUndefined()
+})
+
+test('the marker lands on the same cell for every tenth of the window', () => {
+  for (let tenth = 0; tenth < 10; tenth++) {
+    const cells = one(windowed(1, (5 * HOUR * (10 - tenth)) / 10)).split(' ')[1]!
+    expect(cells.indexOf('┃')).toBe(tenth)
+  }
+})
+
+test('no projection without enough to go on', () => {
+  expect(colorOf(windowed(19, 4.9 * HOUR))).toBeUndefined() // 쓴 양이 적다
+  expect(colorOf(windowed(0, 4.9 * HOUR))).toBeUndefined()
+  expect(colorOf(percent(90, HOUR))).toBeUndefined() // 창 길이를 모른다
+  expect(colorOf({ kind: 'percent', percent: 90, windowMs: 5 * HOUR, observedAt: NOW })).toBeUndefined() // 리셋 시각을 모른다
+  expect(colorOf(windowed(90, 6 * HOUR))).toBeUndefined() // 창보다 리셋이 멀다
+  expect(one(windowed(90, 6 * HOUR))).toBe('A █████████░ 90% (리셋 6h)')
+})
+
+test('a window used up shows the reset in the error color', () => {
+  const spent = windowed(100, 4 * HOUR)
+  expect(one(spent)).toBe('A ██┃███████ 100% (리셋 4h)')
+  expect(colorOf(spent)).toBe('error')
+  expect(colorOf(percent(100, HOUR))).toBe('error')
+})
+
+test('a reading stored before windows existed still draws, as a bar with no marker', () => {
+  const list = [{ id: 'old', label: 'Old' }]
+  const stored = { old: { kind: 'percent' as const, percent: 60, resetsAt: NOW + HOUR, observedAt: NOW } }
+  expect(lineFor(list, stored, NOW)).toBe('Old ██████░░░░ 60% (리셋 1h)')
+})
+
+test('only the source running out is colored, and the line stays whole, on both surfaces', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  const value = { codex: windowed(51, 4 * HOUR), gemini: windowed(10, 4 * HOUR) }
+  on('state.get', () => ({ value: { value, version: 0 } }))
+  on('ui.render', () => ({ type: 'engine', ref: 0 }))
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({
+      plugin: 'ai-usage-meter',
+      component: 'AbovePrompt',
+      requestId: 'band',
+      surface,
+      props: { hasSurvey: false, isWorking: false, bodyColumns: 100, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
+    })
+    const colored = (await ui.findAll({ type: 'Text' })).filter(t => t.props.color)
+    expect(colored.map(t => [t.text, t.props.color])).toEqual([['██┃██░░░░░ 51% 약 58m 뒤 소진', 'warning']])
+    const whole = (await ui.find({ type: 'Text', text: /Gemini/ }))?.text
+    expect(whole).toBe('Codex ██┃██░░░░░ 51% 약 58m 뒤 소진 · Gemini(AG) █░┃░░░░░░░ 10% (리셋 4h)')
+    await ui.unmount()
+  }
 })
 
 const LIVE = JSON.stringify({ limitId: 'codex', windows: [{ usedPercent: 18, windowDurationMins: 300, resetsAt: SEC + 7200 }] })
@@ -115,7 +217,9 @@ async function band($: any, on: any, cases: [number, string][]) {
 
 test('the band sizes its line to bodyColumns, on both surfaces', async ($, on) => {
   await band($, on, [
-    [80, 'Codex 18% (리셋 2h) · Gemini(AG) 25% (리셋 3h)'],
+    [80, 'Codex ██░░░░┃░░░ 18% (리셋 2h) · Gemini(AG) ███░┃░░░░░ 25% (리셋 3h)'],
+    [60, 'Codex ██░░░░┃░░░ 18% 2h · Gemini(AG) ███░┃░░░░░ 25% 3h'],
+    [50, 'Codex 18% (리셋 2h) · Gemini(AG) 25% (리셋 3h)'],
     [32, 'Codex 18% 2h · Gemini(AG) 25% 3h'],
     [26, 'Codex 18% · Gemini(AG) 25%'],
     [15, 'Cx 18% · AG 25%'],

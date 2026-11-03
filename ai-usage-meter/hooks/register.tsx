@@ -1,7 +1,7 @@
 import type { Register } from 'claude-code'
 
 import type {} from '../types/index'
-import { lineFor } from './format'
+import { partsFor } from './format'
 import { providers } from './providers'
 import { pullFromStore, put, refreshDue } from './readings'
 
@@ -33,9 +33,14 @@ export const register: Register = on => {
     if (e.props.hasSurvey) return rest
 
     const { value = {} } = await $.state.get(readings)
-    const line = lineFor(providers, value, await $.clock.now(), e.props.bodyColumns)
+    const parts = partsFor(providers, value, await $.clock.now(), e.props.bodyColumns)
     const { Box, Text } = $.ui.resolve(e)
-    const mine = <Text dimColor wrap="truncate-end">{line}</Text>
+    // 바깥 Text를 흐리게 하면 안쪽 색까지 흐려지므로, 흐림은 조각마다 건다.
+    const mine = (
+      <Text wrap="truncate-end">
+        {parts.map(p => (p.color ? <Text color={p.color}>{p.text}</Text> : <Text dimColor>{p.text}</Text>))}
+      </Text>
+    )
 
     // 아래에 엔진 자신만 있으면 내 줄만 그린다. 다른 mod가 그린 내용이 있으면 함께 쌓는다.
     if (!rest || rest.type === 'engine') return <Box>{mine}</Box>

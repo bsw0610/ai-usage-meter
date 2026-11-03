@@ -1,6 +1,6 @@
-// resetsAt, observedAt: epoch milliseconds
+// resetsAt, observedAt: epoch milliseconds. windowMs: 한도 창의 길이(모르면 없음, 페이스를 계산하지 않는다)
 export type Reading =
-  | { kind: 'percent'; percent: number; resetsAt?: number; observedAt: number }
+  | { kind: 'percent'; percent: number; resetsAt?: number; windowMs?: number; observedAt: number }
   | { kind: 'count'; count: number; unit: string; observedAt: number }
 
 // at: epoch milliseconds

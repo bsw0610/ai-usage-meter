@@ -12,6 +12,7 @@ export function fromWindows(windows: Window[], observedAt: number): Reading | un
   return {
     kind: 'percent',
     percent: w.usedPercent,
+    windowMs: w.minutes * 60_000,
     ...(typeof w.resetsAtSec === 'number' ? { resetsAt: w.resetsAtSec * 1000 } : {}),
     observedAt,
   }
