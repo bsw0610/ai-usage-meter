@@ -59,7 +59,7 @@ test('formatLine shows percent and count readings', () => {
       { label: 'B', reading: { kind: 'count', count: 12, unit: 'req', observedAt: now } },
       { label: 'C', reading: null },
     ]),
-  ).toBe('A ████░░░░░░ 42% · B 12 req · C —')
+  ).toBe('A ━━━━────── 42% · B 12 req · C —')
 })
 
 test('with nothing beneath but the engine, the band is drawn without its node, on both surfaces', async ($, on) => {

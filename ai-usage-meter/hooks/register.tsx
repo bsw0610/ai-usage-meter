@@ -1,7 +1,7 @@
 import type { Register } from 'claude-code'
 
 import type {} from '../types/index'
-import { partsFor } from './format'
+import { BAR_HEIGHT_PX, BAR_WIDTH_PX, barAlt, barSvg, cellsFor, partsOf } from './format'
 import { providers } from './providers'
 import { pullFromStore, put, refreshDue } from './readings'
 
@@ -15,7 +15,11 @@ export const register: Register = on => {
     // 조회는 세션 시작을 막지 않는다. 타이머가 주기적으로 깨어나 조회할 때가 된 소스만 조회하고,
     // ui.render 안에서는 조회하지 않는다.
     void refreshDue($, providers)
-    $.clock.every(TICK_MS, () => refreshDue($, providers))
+    // 값이 그대로여도 시간 눈금과 남은 시간은 움직이므로 틱마다 다시 그린다.
+    $.clock.every(TICK_MS, () => {
+      $.ui.invalidate('ui.render')
+      return refreshDue($, providers)
+    })
     return next(e)
   })
 
@@ -33,14 +37,32 @@ export const register: Register = on => {
     if (e.props.hasSurvey) return rest
 
     const { value = {} } = await $.state.get(readings)
-    const parts = partsFor(providers, value, await $.clock.now(), e.props.bodyColumns)
+    const cells = cellsFor(providers, value, await $.clock.now(), e.props.bodyColumns)
     const { Box, Text } = $.ui.resolve(e)
-    // 바깥 Text를 흐리게 하면 안쪽 색까지 흐려지므로, 흐림은 조각마다 건다.
-    const mine = (
-      <Text wrap="truncate-end">
-        {parts.map(p => (p.color ? <Text color={p.color}>{p.text}</Text> : <Text dimColor>{p.text}</Text>))}
-      </Text>
-    )
+    const textOf = (text: string, color?: 'warning' | 'error') =>
+      color ? <Text color={color} wrap="truncate-end">{text}</Text> : <Text dimColor wrap="truncate-end">{text}</Text>
+
+    let mine
+    if (e.surface !== 'terminal' && cells.some(c => c.bar)) {
+      const { Svg } = $.ui.resolve(e)
+      mine = (
+        <Box flexDirection="row" alignItems="center" columnGap={1}>
+          {cells.flatMap((c, i) => [
+            ...(i ? [textOf('·')] : []),
+            textOf(c.label),
+            ...(c.bar ? [<Svg source={barSvg(c.bar, c.color)} alt={barAlt(c.bar)} width={BAR_WIDTH_PX} height={BAR_HEIGHT_PX} />] : []),
+            textOf(c.value, c.color),
+          ])}
+        </Box>
+      )
+    } else {
+      // 바깥 Text를 흐리게 하면 안쪽 색까지 흐려지므로, 흐림은 조각마다 건다.
+      mine = (
+        <Text wrap="truncate-end">
+          {partsOf(cells).map(p => (p.color ? <Text color={p.color}>{p.text}</Text> : <Text dimColor>{p.text}</Text>))}
+        </Text>
+      )
+    }
 
     // 아래에 엔진 자신만 있으면 내 줄만 그린다. 다른 mod가 그린 내용이 있으면 함께 쌓는다.
     if (!rest || rest.type === 'engine') return <Box>{mine}</Box>
