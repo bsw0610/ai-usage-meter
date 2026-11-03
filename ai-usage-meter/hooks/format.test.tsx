@@ -20,9 +20,9 @@ const entries = [
 ]
 
 test('the line narrows step by step as the room shrinks', () => {
-  const barFull = 'Codex ━━──────── 18% (리셋 2h) · Gemini(AG) ━━╸─────── 25% (리셋 3h)'
+  const barFull = 'Codex ━━──────── 18% (resets 2h) · Gemini(AG) ━━╸─────── 25% (resets 3h)'
   const barHours = 'Codex ━━──────── 18% 2h · Gemini(AG) ━━╸─────── 25% 3h'
-  const full = 'Codex 18% (리셋 2h) · Gemini(AG) 25% (리셋 3h)'
+  const full = 'Codex 18% (resets 2h) · Gemini(AG) 25% (resets 3h)'
   const hours = 'Codex 18% 2h · Gemini(AG) 25% 3h'
   const plain = 'Codex 18% · Gemini(AG) 25%'
   const short = 'Cx 18% · AG 25%'
@@ -47,29 +47,29 @@ test('Hangul counts as two cells, and the separators as one', () => {
 
 test('the reset reads in minutes, hours or days', () => {
   const at = (ms: number) => formatLine([{ label: 'A', reading: percent(1, ms) }], NOW)
-  expect(at(35 * 60_000)).toBe('A ╸───────── 1% (리셋 35m)')
-  expect(at(10_000)).toBe('A ╸───────── 1% (리셋 1m)')
-  expect(at(47 * HOUR)).toBe('A ╸───────── 1% (리셋 1일 23시간)')
-  expect(at(5 * 24 * HOUR)).toBe('A ╸───────── 1% (리셋 5일)')
+  expect(at(35 * 60_000)).toBe('A ╸───────── 1% (resets 35m)')
+  expect(at(10_000)).toBe('A ╸───────── 1% (resets 1m)')
+  expect(at(47 * HOUR)).toBe('A ╸───────── 1% (resets 1d 23h)')
+  expect(at(5 * 24 * HOUR)).toBe('A ╸───────── 1% (resets 5d)')
 })
 
 test('with room, a time under a day reads to the minute; a narrow line keeps whole hours', () => {
   const MINUTE = 60_000
   const left = (ms: number, columns?: number) => one(percent(30, ms), columns)
-  expect(left(2 * HOUR + 32 * MINUTE)).toBe('A ━━━─────── 30% (리셋 2h32m)')
-  expect(left(2 * HOUR)).toBe('A ━━━─────── 30% (리셋 2h)')
-  expect(left(59 * MINUTE)).toBe('A ━━━─────── 30% (리셋 59m)')
-  expect(left(23 * HOUR + 59 * MINUTE)).toBe('A ━━━─────── 30% (리셋 23h59m)')
-  expect(left(45 * HOUR)).toBe('A ━━━─────── 30% (리셋 1일 21시간)')
+  expect(left(2 * HOUR + 32 * MINUTE)).toBe('A ━━━─────── 30% (resets 2h32m)')
+  expect(left(2 * HOUR)).toBe('A ━━━─────── 30% (resets 2h)')
+  expect(left(59 * MINUTE)).toBe('A ━━━─────── 30% (resets 59m)')
+  expect(left(23 * HOUR + 59 * MINUTE)).toBe('A ━━━─────── 30% (resets 23h59m)')
+  expect(left(45 * HOUR)).toBe('A ━━━─────── 30% (resets 1d 21h)')
   expect(left(2 * HOUR + 32 * MINUTE, displayWidth('A ━━━─────── 30% 3h'))).toBe('A ━━━─────── 30% 3h')
 })
 
 test('with room, a day or more reads in days and hours; a narrow line stays short', () => {
   const left = (ms: number, columns?: number) => one(percent(30, ms), columns)
-  expect(left(44 * HOUR)).toBe('A ━━━─────── 30% (리셋 1일 20시간)')
-  expect(left(24 * HOUR)).toBe('A ━━━─────── 30% (리셋 1일)')
-  expect(left(48 * HOUR)).toBe('A ━━━─────── 30% (리셋 2일)')
-  expect(left(5 * 24 * HOUR + 3 * HOUR)).toBe('A ━━━─────── 30% (리셋 5일 3시간)')
+  expect(left(44 * HOUR)).toBe('A ━━━─────── 30% (resets 1d 20h)')
+  expect(left(24 * HOUR)).toBe('A ━━━─────── 30% (resets 1d)')
+  expect(left(48 * HOUR)).toBe('A ━━━─────── 30% (resets 2d)')
+  expect(left(5 * 24 * HOUR + 3 * HOUR)).toBe('A ━━━─────── 30% (resets 5d 3h)')
   expect(left(44 * HOUR, displayWidth('A ━━━─────── 30% 44h'))).toBe('A ━━━─────── 30% 44h')
 })
 
@@ -100,7 +100,7 @@ test('a fourth provider narrows with the others', () => {
     fake: percent(50, HOUR),
   }
   expect(lineFor([...providers, fake], readings, NOW, 200)).toBe(
-    'Codex ━━──────── 18% (리셋 2h) · Gemini(AG) ━━╸─────── 25% (리셋 3h) · Fake ━━━━━───── 50% (리셋 1h)',
+    'Codex ━━──────── 18% (resets 2h) · Gemini(AG) ━━╸─────── 25% (resets 3h) · Fake ━━━━━───── 50% (resets 1h)',
   )
   expect(lineFor([...providers, fake], readings, NOW, 20)).toBe('Cx 18% · AG 25% · Fk 50%')
 })
@@ -109,11 +109,11 @@ const one = (reading: any, columns?: number) => formatLine([{ label: 'A', short:
 const colorOf = (reading: any) => partsOf(formatRows([{ label: 'A', reading }], NOW)[0]!).find(p => p.color)?.color
 
 test('the bar keeps ten cells', () => {
-  expect(one(percent(10, 4 * HOUR))).toBe('A ━───────── 10% (리셋 4h)')
-  expect(one(percent(100, 30 * 60_000))).toBe('A ━━━━━━━━━━ 100% (리셋 30m)')
-  expect(one(percent(100, HOUR))).toBe('A ━━━━━━━━━━ 100% (리셋 1h)')
-  expect(one(percent(99, HOUR))).toBe('A ━━━━━━━━━╸ 99% (리셋 1h)')
-  expect(one(percent(0, HOUR))).toBe('A ────────── 0% (리셋 1h)')
+  expect(one(percent(10, 4 * HOUR))).toBe('A ━───────── 10% (resets 4h)')
+  expect(one(percent(100, 30 * 60_000))).toBe('A ━━━━━━━━━━ 100% (resets 30m)')
+  expect(one(percent(100, HOUR))).toBe('A ━━━━━━━━━━ 100% (resets 1h)')
+  expect(one(percent(99, HOUR))).toBe('A ━━━━━━━━━╸ 99% (resets 1h)')
+  expect(one(percent(0, HOUR))).toBe('A ────────── 0% (resets 1h)')
 })
 
 test('the color turns red from 90%, not before', () => {
@@ -143,18 +143,18 @@ test('the used line is blue, and red once the limit is used up', () => {
 
 test('the bar is only the used line, and says what it shows', () => {
   expect(barSvg({ percent: 50 })).not.toContain('y1="1"')
-  expect(barAlt({ percent: 51.4 })).toBe('51% 사용')
+  expect(barAlt({ percent: 51.4 })).toBe('51% used')
 })
 
 test('a window used up shows the reset in the error color', () => {
-  expect(one(percent(100, 4 * HOUR))).toBe('A ━━━━━━━━━━ 100% (리셋 4h)')
+  expect(one(percent(100, 4 * HOUR))).toBe('A ━━━━━━━━━━ 100% (resets 4h)')
   expect(colorOf(percent(100, HOUR))).toBe('error')
 })
 
 test('a reading stored with the window fields of an older version draws with no marker or warning', () => {
   const list = [{ id: 'old', label: 'Old' }]
   const stored: any = { old: { kind: 'percent', percent: 51, resetsAt: NOW + 4 * HOUR, windowMs: 5 * HOUR, changedAt: NOW, observedAt: NOW } }
-  expect(lineFor(list, stored, NOW)).toBe('Old ━━━━━───── 51% (리셋 4h)')
+  expect(lineFor(list, stored, NOW)).toBe('Old ━━━━━───── 51% (resets 4h)')
 })
 
 test('only the limit used up is colored, and the line stays whole, on both surfaces', async ($, on) => {
@@ -173,10 +173,10 @@ test('only the limit used up is colored, and the line stays whole, on both surfa
     })
     const colored = (await ui.findAll({ type: 'Text' })).filter(t => t.props.color)
     if (surface === 'terminal') {
-      expect(colored.map(t => [t.text, t.props.color])).toEqual([['━━━━━━━━━━ 100% (리셋 4h)', 'error']])
-      expect((await ui.find({ type: 'Text', text: /Gemini/ }))?.text).toBe('Codex ━━━━━━━━━━ 100% (리셋 4h) · Gemini(AG) ━───────── 10% (리셋 4h)')
+      expect(colored.map(t => [t.text, t.props.color])).toEqual([['━━━━━━━━━━ 100% (resets 4h)', 'error']])
+      expect((await ui.find({ type: 'Text', text: /Gemini/ }))?.text).toBe('Codex ━━━━━━━━━━ 100% (resets 4h) · Gemini(AG) ━───────── 10% (resets 4h)')
     } else {
-      expect(colored.map(t => [t.text, t.props.color])).toEqual([['100% (리셋 4h)', 'error']])
+      expect(colored.map(t => [t.text, t.props.color])).toEqual([['100% (resets 4h)', 'error']])
       const [hot, cold] = await ui.findAll({ type: 'Svg' })
       expect(hot?.props.source).toContain('#dc2626')
       expect(cold?.props.source).not.toContain('#dc2626')
@@ -197,12 +197,12 @@ test('each source gets its own row with both limits, and the columns line up', (
     { label: 'Gemini(AG)', short: 'AG', reading: both(25, 3 * HOUR, 10, 5 * DAY) },
   ]
   expect(formatLine(list, NOW).split('\n')).toEqual([
-    'Codex      ━━━━━━━━── 82% (리셋 3h7m) · 주간 ━━━━╸───── 46% (리셋 1일 21시간)',
-    'Gemini(AG) ━━╸─────── 25% (리셋 3h)   · 주간 ━───────── 10% (리셋 5일)',
+    'Codex      ━━━━━━━━── 82% (resets 3h7m) · Weekly ━━━━╸───── 46% (resets 1d 21h)',
+    'Gemini(AG) ━━╸─────── 25% (resets 3h)   · Weekly ━───────── 10% (resets 5d)',
   ])
   const narrow = formatLine(list, NOW, 50).split('\n')
-  expect(narrow).toEqual(['Codex      82% 3h · 주간 46% 45h', 'Gemini(AG) 25% 3h · 주간 10% 5d'])
-  expect(formatLine(list, NOW, 10).split('\n')).toEqual(['Cx 82% · 주 46%', 'AG 25% · 주 10%'])
+  expect(narrow).toEqual(['Codex      82% 3h · Weekly 46% 45h', 'Gemini(AG) 25% 3h · Weekly 10% 5d'])
+  expect(formatLine(list, NOW, 10).split('\n')).toEqual(['Cx 82% · Wk 46%', 'AG 25% · Wk 10%'])
 })
 
 test('a source with one limit or none keeps its row, and nothing stacks without a weekly limit', () => {
@@ -217,10 +217,10 @@ test('a source with one limit or none keeps its row, and nothing stacks without 
 test('with room for one row, each source shows its more urgent limit', () => {
   const line = (reading: any) => formatLine([{ label: 'A', reading }, { label: 'B', reading: null }], NOW, Infinity, 1)
   expect(line(both(82, 3.116 * HOUR, 46, 45 * HOUR))).toContain('A ━━━━━━━━── 82%') // 5시간 쪽이 더 많이 썼다
-  expect(line(both(10, 4 * HOUR, 95, 4 * DAY))).toContain('A 주간') // 주간 쪽이 더 많이 썼다
+  expect(line(both(10, 4 * HOUR, 95, 4 * DAY))).toContain('A Weekly') // 주간 쪽이 더 많이 썼다
   expect(line(both(100, 4 * HOUR, 95, 4 * DAY))).toContain('A ━━━━━━━━━━ 100%') // 다 쓴 쪽이 먼저다
-  expect(line(both(10, 4 * HOUR, 100, 4 * DAY))).toContain('A 주간') // 주간을 다 쓰면 5시간 여유는 소용없다
-  expect(line(both(10, 4 * HOUR, 95, -HOUR))).not.toContain('주간') // 리셋이 지난 주간 창은 0%다
+  expect(line(both(10, 4 * HOUR, 100, 4 * DAY))).toContain('A Weekly') // 주간을 다 쓰면 5시간 여유는 소용없다
+  expect(line(both(10, 4 * HOUR, 95, -HOUR))).not.toContain('Weekly') // 리셋이 지난 주간 창은 0%다
 })
 
 test('each limit is colored on its own', () => {
@@ -238,11 +238,11 @@ test('a dash says why at the widths that have room', () => {
 
   expect(at({})).toBe('Alpha —') // 아직 결과가 없다
   expect(at({}, ok)).toBe('Alpha —') // 첫 조회 중
-  expect(at({}, failed)).toBe('Alpha — 실패')
-  expect(at({}, missing)).toBe('Alpha — 미설치')
-  expect(at(old, ok)).toBe('Alpha — 오래됨')
-  expect(at(old)).toBe('Alpha — 오래됨')
-  expect(at(old, failed)).toBe('Alpha — 실패')
+  expect(at({}, failed)).toBe('Alpha — failed')
+  expect(at({}, missing)).toBe('Alpha — not installed')
+  expect(at(old, ok)).toBe('Alpha — stale')
+  expect(at(old)).toBe('Alpha — stale')
+  expect(at(old, failed)).toBe('Alpha — failed')
 
   // 유효한 값은 조회가 실패해도 그대로 그린다.
   expect(at({ a: percent(9) }, failed)).toContain('9%')
@@ -254,7 +254,7 @@ test('a dash says why at the widths that have room', () => {
 
 test('a stored reading with no weekly limit still draws on one line', () => {
   const stored = { codex: { kind: 'percent' as const, percent: 60, resetsAt: NOW + HOUR, observedAt: NOW } }
-  expect(lineFor(providers, stored, NOW)).toBe('Codex ━━━━━━──── 60% (리셋 1h) · Gemini(AG) —')
+  expect(lineFor(providers, stored, NOW)).toBe('Codex ━━━━━━──── 60% (resets 1h) · Gemini(AG) —')
 })
 
 test('the band draws one row per source, on both surfaces', async ($, on) => {
@@ -267,16 +267,16 @@ test('the band draws one row per source, on both surfaces', async ($, on) => {
     $.ui.mount({ plugin: 'ai-usage-meter', component: 'AbovePrompt', requestId: 'band', surface, props: { ...props, maxRows } })
 
   const terminal = await mount('terminal', 5)
-  expect((await terminal.find({ type: 'Text', text: /^Codex/ }))?.text).toBe('Codex      ━━━━━━━━── 82% (리셋 3h7m) · 주간 ━━━━╸───── 46% (리셋 1일 21시간)')
-  expect((await terminal.find({ type: 'Text', text: /^Gemini/ }))?.text).toBe('Gemini(AG) ━━╸─────── 25% (리셋 3h)   · 주간 ━───────── 10% (리셋 5일)')
+  expect((await terminal.find({ type: 'Text', text: /^Codex/ }))?.text).toBe('Codex      ━━━━━━━━── 82% (resets 3h7m) · Weekly ━━━━╸───── 46% (resets 1d 21h)')
+  expect((await terminal.find({ type: 'Text', text: /^Gemini/ }))?.text).toBe('Gemini(AG) ━━╸─────── 25% (resets 3h)   · Weekly ━───────── 10% (resets 5d)')
   await terminal.unmount()
 
   const desktop = await mount('desktop', 5)
   expect((await desktop.findAll({ type: 'Svg' })).map((b: any) => b.props.alt)).toEqual([
-    '82% 사용',
-    '46% 사용',
-    '25% 사용',
-    '10% 사용',
+    '82% used',
+    '46% used',
+    '25% used',
+    '10% used',
   ])
   await desktop.unmount()
 
@@ -302,6 +302,17 @@ test('each language has its own words for the reset, the days, the weekly limit 
   const whole = (lang: 'en' | 'ja', ms: number) => formatLine([{ label: 'A', reading: percent(1, ms) }], NOW, Infinity, Infinity, lang)
   expect(whole('en', 48 * HOUR)).toBe('A ╸───────── 1% (resets 2d)')
   expect(whole('ja', 48 * HOUR)).toBe('A ╸───────── 1% (リセット 2日)')
+})
+
+test('Korean keeps its own words', () => {
+  const list = [{ label: 'Codex', short: 'Cx', reading: both(82, 3.116 * HOUR, 46, 45 * HOUR) }]
+  expect(formatLine(list, NOW, Infinity, Infinity, 'ko')).toBe('Codex ━━━━━━━━── 82% (리셋 3h7m) · 주간 ━━━━╸───── 46% (리셋 1일 21시간)')
+  expect(formatLine(list, NOW, 10, Infinity, 'ko')).toBe('Cx 82% · 주 46%')
+  expect(barAlt({ percent: 51.4 }, 'ko')).toBe('51% 사용')
+  const at = (attempts: any, readings: any = {}) => lineFor([{ id: 'a', label: 'Alpha' }], readings, NOW, Infinity, Infinity, attempts, 'ko')
+  expect(at({ a: { at: NOW, isOk: false } })).toBe('Alpha — 실패')
+  expect(at({ a: { at: NOW, isOk: false, isMissing: true } })).toBe('Alpha — 미설치')
+  expect(at({}, { a: { kind: 'percent', percent: 9, observedAt: NOW - HOUR } })).toBe('Alpha — 오래됨')
 })
 
 test('each language says why a value is missing', () => {
@@ -363,7 +374,7 @@ for (const [language, row, alt] of [
   })
 }
 
-test('with no language chosen, or one not on the list, the band stays in Korean', { options: { language: 'fr' } }, async ($, on) => {
+test('a language not on the list falls back to English', { options: { language: 'fr' } }, async ($, on) => {
   mock.clock(on, { now: NOW })
   on('state.get', () => ({ value: { value: { codex: percent(50, HOUR) }, version: 0 } }))
   on('ui.render', () => ({ type: 'engine', ref: 0 }))
@@ -374,7 +385,7 @@ test('with no language chosen, or one not on the list, the band stays in Korean'
     surface: 'terminal',
     props: { hasSurvey: false, isWorking: false, bodyColumns: 100, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
   })
-  expect((await ui.find({ type: 'Text', text: /^Codex/ }))?.text).toContain('(리셋 1h)')
+  expect((await ui.find({ type: 'Text', text: /^Codex/ }))?.text).toContain('(resets 1h)')
   await ui.unmount()
 })
 
@@ -409,7 +420,7 @@ async function band($: any, on: any, cases: [number, string][]) {
       if (surface === 'desktop' && want.includes('━')) {
         // 막대가 있는 단계는 Svg로 그린다.
         const bars = await ui.findAll({ type: 'Svg' })
-        expect(bars.map((b: any) => b.props.alt)).toEqual(['18% 사용', '25% 사용'])
+        expect(bars.map((b: any) => b.props.alt)).toEqual(['18% used', '25% used'])
         expect((await ui.findAll({ type: 'Text' })).map((t: any) => t.text).join(' ')).toBe(want.replace(/ [━╸─]+/g, ''))
       } else {
         expect((await ui.find({ type: 'Text', text: /Cx|Codex/ }))?.text).toBe(want)
@@ -422,9 +433,9 @@ async function band($: any, on: any, cases: [number, string][]) {
 
 test('the band sizes its line to bodyColumns, on both surfaces', async ($, on) => {
   await band($, on, [
-    [80, 'Codex ━━──────── 18% (리셋 2h) · Gemini(AG) ━━╸─────── 25% (리셋 3h)'],
+    [80, 'Codex ━━──────── 18% (resets 2h) · Gemini(AG) ━━╸─────── 25% (resets 3h)'],
     [60, 'Codex ━━──────── 18% 2h · Gemini(AG) ━━╸─────── 25% 3h'],
-    [50, 'Codex 18% (리셋 2h) · Gemini(AG) 25% (리셋 3h)'],
+    [50, 'Codex 18% (resets 2h) · Gemini(AG) 25% (resets 3h)'],
     [32, 'Codex 18% 2h · Gemini(AG) 25% 3h'],
     [26, 'Codex 18% · Gemini(AG) 25%'],
     [15, 'Cx 18% · AG 25%'],

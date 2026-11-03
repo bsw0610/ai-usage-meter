@@ -223,7 +223,7 @@ test('a failure leaves its reason in the store, and the band says it failed', as
   expect(attempts.codex.error).toContain('helper exit 1: timeout')
   expect(attempts.codex.error).toContain('log:')
   expect(attempts.gemini.error).toContain('agy: ')
-  expect(await wide($)).toBe('Codex — 실패 · Gemini(AG) — 실패')
+  expect(await wide($)).toBe('Codex — failed · Gemini(AG) — failed')
 })
 
 test('a program that is not there reads as not installed', async ($, on) => {
@@ -232,7 +232,7 @@ test('a program that is not there reads as not installed', async ($, on) => {
   mode.codexExit = 2
   await start($, clock)
   expect((store['attempts-v3'] as any).codex.isMissing).toBe(true)
-  expect(await wide($)).toContain('Codex — 미설치')
+  expect(await wide($)).toContain('Codex — not installed')
 })
 
 test('a very long reason is cut before it is stored', async ($, on) => {
@@ -247,7 +247,7 @@ test("another session's failure and its reason survive the store", async ($, on)
   const failed = { at: NOW, isOk: false, error: 'spawn agy ENOENT', isMissing: true }
   const { clock, store } = world(on, { 'attempts-v3': { gemini: failed } })
   await start($, clock)
-  expect(await wide($)).toContain('Gemini(AG) — 미설치')
+  expect(await wide($)).toContain('Gemini(AG) — not installed')
   expect((store['attempts-v3'] as any).gemini).toEqual(failed)
 })
 
@@ -263,7 +263,7 @@ test('a retry keeps the failure until its result, and success clears the reason'
   expect(calls.attemptWhileRunning.at).toBe(NOW + 3 * MIN)
   expect((store['attempts-v3'] as any).codex).toEqual({ at: NOW + 3 * MIN, isOk: true })
   expect(await wide($)).toContain('Codex ')
-  expect(await wide($)).not.toContain('실패')
+  expect(await wide($)).not.toContain('failed')
 })
 
 test('a value past its lifetime after a failure says failed, not old', async ($, on) => {
@@ -271,5 +271,5 @@ test('a value past its lifetime after a failure says failed, not old', async ($,
   await start($, clock)
   mode.codex = 'fail'
   await clock.advance(7 * MIN)
-  expect(await wide($)).toContain('Codex — 실패')
+  expect(await wide($)).toContain('Codex — failed')
 })

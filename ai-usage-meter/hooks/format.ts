@@ -32,7 +32,7 @@ const BAR_CELLS = 10
 
 export type Lang = 'ko' | 'en' | 'ja'
 
-export const DEFAULT_LANG: Lang = 'ko'
+export const DEFAULT_LANG: Lang = 'en'
 
 // userConfig의 language 값. 엔진이 목록 밖의 값을 걸러 주므로, 타입을 좁히는 일만 한다.
 export const isLang = (value: unknown): value is Lang => value === 'ko' || value === 'en' || value === 'ja'
