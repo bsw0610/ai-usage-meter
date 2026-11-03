@@ -1,0 +1,5 @@
+{
+  "name": "claude-code-mods",
+  "owner": { "name": "bsw0610" },
+  "plugins": [{ "name": "ai-usage-meter", "source": "./ai-usage-meter" }]
+}
