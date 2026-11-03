@@ -49,8 +49,8 @@ test('the reset reads in minutes, hours or days', () => {
   const at = (ms: number) => formatLine([{ label: 'A', reading: percent(1, ms) }], NOW)
   expect(at(35 * 60_000)).toBe('A ╸───────── 1% (리셋 35m)')
   expect(at(10_000)).toBe('A ╸───────── 1% (리셋 1m)')
-  expect(at(47 * HOUR)).toBe('A ╸───────── 1% (리셋 47h)')
-  expect(at(5 * 24 * HOUR)).toBe('A ╸───────── 1% (리셋 5d)')
+  expect(at(47 * HOUR)).toBe('A ╸───────── 1% (리셋 1일 23시간)')
+  expect(at(5 * 24 * HOUR)).toBe('A ╸───────── 1% (리셋 5일)')
 })
 
 test('with room, a time under a day reads to the minute; a narrow line keeps whole hours', () => {
@@ -60,13 +60,22 @@ test('with room, a time under a day reads to the minute; a narrow line keeps who
   expect(left(2 * HOUR)).toBe('A ━━━─────── 30% (리셋 2h)')
   expect(left(59 * MINUTE)).toBe('A ━━━─────── 30% (리셋 59m)')
   expect(left(23 * HOUR + 59 * MINUTE)).toBe('A ━━━─────── 30% (리셋 23h59m)')
-  expect(left(45 * HOUR)).toBe('A ━━━─────── 30% (리셋 45h)')
+  expect(left(45 * HOUR)).toBe('A ━━━─────── 30% (리셋 1일 21시간)')
   expect(left(2 * HOUR + 32 * MINUTE, displayWidth('A ━━━─────── 30% 3h'))).toBe('A ━━━─────── 30% 3h')
 
   const fast = windowed(60, 3 * HOUR + 30 * MINUTE) // 1시간 30분에 60%, 소진까지 1시간
   expect(one(fast)).toContain('약 1h 뒤 소진')
   const faster = windowed(55, 3 * HOUR + 30 * MINUTE) // 1시간 30분에 55%, 소진까지 약 1시간 14분
   expect(one(faster)).toContain('약 1h14m 뒤 소진')
+})
+
+test('with room, a day or more reads in days and hours; a narrow line stays short', () => {
+  const left = (ms: number, columns?: number) => one(percent(30, ms), columns)
+  expect(left(44 * HOUR)).toBe('A ━━━─────── 30% (리셋 1일 20시간)')
+  expect(left(24 * HOUR)).toBe('A ━━━─────── 30% (리셋 1일)')
+  expect(left(48 * HOUR)).toBe('A ━━━─────── 30% (리셋 2일)')
+  expect(left(5 * 24 * HOUR + 3 * HOUR)).toBe('A ━━━─────── 30% (리셋 5일 3시간)')
+  expect(left(44 * HOUR, displayWidth('A ━━━─────── 30% 44h'))).toBe('A ━━━─────── 30% 44h')
 })
 
 test('a passed reset shows 0% and no reset', () => {
@@ -259,8 +268,8 @@ test('each source gets its own row with both limits, and the columns line up', (
     { label: 'Gemini(AG)', short: 'AG', reading: both(25, 3 * HOUR, 10, 5 * DAY) },
   ]
   expect(formatLine(list, NOW).split('\n')).toEqual([
-    'Codex      ━━━┃━━━━── 82% 약 25m 뒤 소진 · 주간 ━━━━╸──┃── 46% (리셋 45h)',
-    'Gemini(AG) ━━╸─┃───── 25% (리셋 3h)      · 주간 ━─┃─────── 10% (리셋 5d)',
+    'Codex      ━━━┃━━━━── 82% 약 25m 뒤 소진 · 주간 ━━━━╸──┃── 46% (리셋 1일 21시간)',
+    'Gemini(AG) ━━╸─┃───── 25% (리셋 3h)      · 주간 ━─┃─────── 10% (리셋 5일)',
   ])
   const narrow = formatLine(list, NOW, 50).split('\n')
   expect(narrow).toEqual(['Codex      82% 소진 25m · 주간 46% 45h', 'Gemini(AG) 25% 3h       · 주간 10% 5d'])
@@ -329,8 +338,8 @@ test('the band draws one row per source, on both surfaces', async ($, on) => {
     $.ui.mount({ plugin: 'ai-usage-meter', component: 'AbovePrompt', requestId: 'band', surface, props: { ...props, maxRows } })
 
   const terminal = await mount('terminal', 5)
-  expect((await terminal.find({ type: 'Text', text: /^Codex/ }))?.text).toBe('Codex      ━━━┃━━━━── 82% 약 25m 뒤 소진 · 주간 ━━━━╸──┃── 46% (리셋 45h)')
-  expect((await terminal.find({ type: 'Text', text: /^Gemini/ }))?.text).toBe('Gemini(AG) ━━╸─┃───── 25% (리셋 3h)      · 주간 ━─┃─────── 10% (리셋 5d)')
+  expect((await terminal.find({ type: 'Text', text: /^Codex/ }))?.text).toBe('Codex      ━━━┃━━━━── 82% 약 25m 뒤 소진 · 주간 ━━━━╸──┃── 46% (리셋 1일 21시간)')
+  expect((await terminal.find({ type: 'Text', text: /^Gemini/ }))?.text).toBe('Gemini(AG) ━━╸─┃───── 25% (리셋 3h)      · 주간 ━─┃─────── 10% (리셋 5일)')
   await terminal.unmount()
 
   const desktop = await mount('desktop', 5)

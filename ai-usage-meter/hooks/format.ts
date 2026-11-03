@@ -53,11 +53,15 @@ export function displayWidth(text: string): number {
   return width
 }
 
-// isExact면 하루 안쪽은 분까지 쓴다. 좁은 줄에서는 시간 단위로 반올림한다.
+// isExact면 하루 안쪽은 분까지, 그 위는 일과 시간으로 쓴다. 좁은 줄에서는 한 단위로 반올림한다.
 function until(ms: number, isExact = false): string {
   const minutes = Math.max(1, Math.round(ms / 60_000))
   if (minutes < 60) return `${minutes}m`
   if (isExact && minutes < 24 * 60) return `${Math.floor(minutes / 60)}h${minutes % 60 ? `${minutes % 60}m` : ''}`
+  if (isExact) {
+    const totalHours = Math.round(minutes / 60)
+    return `${Math.floor(totalHours / 24)}일${totalHours % 24 ? ` ${totalHours % 24}시간` : ''}`
+  }
   const hours = Math.round(minutes / 60)
   return hours < 48 ? `${hours}h` : `${Math.round(hours / 24)}d`
 }
