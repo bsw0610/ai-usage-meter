@@ -26,6 +26,7 @@ function world(on: any, run: Run) {
   mock.store(on)
   mock.env(on, { HOME: '/home/test' })
   const calls: string[][] = []
+  const envs: (Record<string, string> | undefined)[] = []
   on('session.start', (_: unknown, e: any) => ({ cwd: e.cwd }))
   on('ui.render', ($: any, e: any) => {
     const { Box } = $.ui.resolve(e)
@@ -34,6 +35,7 @@ function world(on: any, run: Run) {
   on('fs.list', () => ({ value: [] }))
   on('process.run', (_: unknown, e: any) => {
     calls.push([...e.argv])
+    envs.push(e.init?.env)
     if (e.argv[0] !== 'agy') return { value: { exitCode: 1, stdout: '', stderr: '' } }
     if (run === 'throw') throw new Error('spawn failed')
     if (run === 'exit1') return { value: { exitCode: 1, stdout: '', stderr: 'x' } }
@@ -41,7 +43,7 @@ function world(on: any, run: Run) {
     if (run === 'login') return { value: { exitCode: 0, stdout: 'Please sign in to continue\n', stderr: '' } }
     return { value: { exitCode: 0, stdout: SAMPLE + '\n', stderr: '' } }
   })
-  return { clock, calls }
+  return { clock, calls, envs }
 }
 
 async function shown($: any, clock: { settle: () => Promise<void> }, surface: 'terminal' | 'desktop' = 'desktop') {
@@ -112,4 +114,12 @@ test('parseUsage: with both limits, the weekly one comes along as used percent',
     secondary: { percent: 10, resetsAt: Date.parse('2026-11-10T00:00:00Z') },
     observedAt: NOW,
   })
+})
+
+test('agy runs with its self-updater turned off', async ($, on) => {
+  const { clock, calls, envs } = world(on, 'ok')
+  await shown($, clock)
+  const i = calls.findIndex(argv => argv[0] === 'agy')
+  expect(i).toBeGreaterThanOrEqual(0)
+  expect(envs[i]).toEqual({ AGY_CLI_DISABLE_AUTO_UPDATE: 'true' })
 })
