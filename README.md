@@ -87,7 +87,7 @@ The mod sends nothing anywhere itself. `codex` and `agy` contact their own servi
 - Plugin hooks in Claude Code are in early access and may change between releases.
 - The desktop app hides the band while a next-step question box is open, and a new session shows it only after your first message.
 - A session only draws the band while you are viewing it.
-- The ChatGPT logo is black or white according to your system's appearance, so it can mismatch if the app's theme is set differently from the system.
+- The ChatGPT logo is black or white according to the color scheme the app reports, not the band's background, so it could be hard to see if the two ever differ.
 - A plan with no five-hour limit shows `Wk` in the first column. This has only been tested with made-up responses, as has the signed-out `agy` case.
 - If a plan reports neither a five-hour nor a weekly limit, its row shows `—` even when nothing is wrong.
 
@@ -107,4 +107,4 @@ This is an independent project, not affiliated with or endorsed by OpenAI or Goo
 
 ## License
 
-No license has been chosen yet.
+MIT. See [LICENSE](LICENSE). The license covers this project's own work and gives no rights to the trademarks named above.
