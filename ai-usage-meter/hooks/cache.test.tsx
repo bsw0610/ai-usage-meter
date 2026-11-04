@@ -75,21 +75,21 @@ test('drawing the band never queries anything', async ($, on) => {
     for (let i = 0; i < 3; i++) await line($, surface)
   }
   expect(calls).toEqual(before)
-  expect(await line($)).toBe('Cx 31% · AG 25%')
+  expect(await line($)).toBe('Cx 31% │ AG 25%')
 })
 
 test('one source failing leaves the other intact, on both surfaces', async ($, on) => {
   const { clock } = world(on, { codex: 'ok', agy: 'fail' })
   await start($, clock)
   for (const surface of ['terminal', 'desktop'] as const) {
-    expect(await line($, surface)).toBe('Cx 31% · AG —')
+    expect(await line($, surface)).toBe('Cx 31% │ AG —')
   }
 })
 
 test('the other way round: Codex failing leaves Gemini intact', async ($, on) => {
   const { clock } = world(on, { codex: 'fail', agy: 'ok' })
   await start($, clock)
-  expect(await line($)).toBe('Cx — · AG 25%')
+  expect(await line($)).toBe('Cx — │ AG 25%')
 })
 
 test('a failed Gemini is not retried for thirty minutes; Codex keeps its three', async ($, on) => {
@@ -112,7 +112,7 @@ test('a recent attempt from an earlier session is respected on a new start', asy
   })
   await start($, clock)
   expect(calls).toEqual({ node: 0, agy: 0 })
-  expect(await line($)).toBe('Cx 9% · AG —')
+  expect(await line($)).toBe('Cx 9% │ AG —')
 })
 
 test('after the three minutes of an old attempt the source is queried', async ($, on) => {

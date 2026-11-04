@@ -51,7 +51,7 @@ async function shown($: any, clock: { settle: () => Promise<void> }, surface: 't
   const ui = await $.ui.mount({ ...BAND, surface })
   const text: string | undefined = (await ui.find({ type: 'Text', text: /Cx/ }))?.text
   await ui.unmount()
-  return text?.split(' · ')[0]?.replace(/ +/g, ' ')
+  return text?.split(' │ ')[0]?.replace(/ +/g, ' ')
 }
 
 function world(on: any, s: Setup = {}) {
@@ -150,7 +150,7 @@ test('only a 7-day window falls back to it', async ($, on) => {
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   await clock.settle()
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop', props: { ...BAND.props, bodyColumns: 12 } })
-  expect((await ui.find({ type: 'Text', text: /Cx/ }))?.text).toBe('Cx Wk 61% · AG —')
+  expect((await ui.find({ type: 'Text', text: /Cx/ }))?.text).toBe('Cx Wk 61% │ AG —')
   await ui.unmount()
 })
 

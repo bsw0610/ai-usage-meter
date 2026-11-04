@@ -53,7 +53,7 @@ async function shown($: any, clock: { settle: () => Promise<void> }, surface: 't
   const ui = await $.ui.mount({ ...BAND, surface })
   const text: string | undefined = (await ui.find({ type: 'Text', text: /AG/ }))?.text
   await ui.unmount()
-  return text?.split(' · ').find(x => x.startsWith('AG'))
+  return text?.split(' │ ').find(x => x.startsWith('AG'))
 }
 
 test('the Gemini five-hour window is shown as used percent, on both surfaces', async ($, on) => {
@@ -93,7 +93,7 @@ test('a failing agy does not blank Codex', async ($, on) => {
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
   const text = (await ui.find({ type: 'Text', text: /Cx/ }))?.text
   await ui.unmount()
-  expect(text).toBe('Cx — · AG —')
+  expect(text).toBe('Cx — │ AG —')
 })
 
 test('parseUsage: weekly is the fallback, remaining becomes used, other groups are ignored', () => {
@@ -172,8 +172,8 @@ test('one agy run reaches the band with the Argon limit', async ($, on) => {
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await clock.settle()
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal', props: { ...BAND.props, bodyColumns: 200 } })
-  const text: string | undefined = (await ui.find({ type: 'Text', text: /Argon/ }))?.text
+  const text: string | undefined = (await ui.find({ type: 'Text', text: /Ar 3%/ }))?.text
   await ui.unmount()
-  expect(text).toContain('Argon 3%')
+  expect(text).toContain('Ar 3%')
   expect(calls.filter(a => a[0] === 'agy').length).toBe(1)
 })

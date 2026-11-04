@@ -21,14 +21,14 @@ test('the band shows a dash for every provider, on both surfaces', async ($, on)
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ ...BAND, surface })
     const line = await ui.find({ type: 'Text', text: /Codex/ })
-    expect(line?.text).toBe('Codex — · Gemini(AG) —')
+    expect(line?.text).toBe('Codex — │ Gemini(AG) —')
     await ui.unmount()
   }
 })
 
 test('a fourth provider appears with no other file changed', () => {
   const fake = { id: 'fake', label: 'Fake', short: 'Fk' }
-  expect(lineFor([...providers, fake], {})).toBe('Codex — · Gemini(AG) — · Fake —')
+  expect(lineFor([...providers, fake], {})).toBe('Codex — │ Gemini(AG) — │ Fake —')
   expect(lineFor([...providers, fake], { fake: { kind: 'count', count: 3, unit: 'req', observedAt: 1 } })).toContain('Fake 3 req')
 })
 
@@ -59,7 +59,7 @@ test('formatLine shows percent and count readings', () => {
       { label: 'B', reading: { kind: 'count', count: 12, unit: 'req', observedAt: now } },
       { label: 'C', reading: null },
     ]),
-  ).toBe('A ━━━━────── 42% · B 12 req · C —')
+  ).toBe('A 5h ━━━━──────  42% │ B 12 req │ C —')
 })
 
 test('with nothing beneath but the engine, the band is drawn without its node, on both surfaces', async ($, on) => {
@@ -69,7 +69,7 @@ test('with nothing beneath but the engine, the band is drawn without its node, o
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ ...BAND, surface })
-    expect((await ui.find({ type: 'Text', text: /Codex/ }))?.text).toBe('Codex — · Gemini(AG) —')
+    expect((await ui.find({ type: 'Text', text: /Codex/ }))?.text).toBe('Codex — │ Gemini(AG) —')
     await ui.unmount()
   }
 })

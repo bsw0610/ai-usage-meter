@@ -2,7 +2,7 @@ import type { Register, RenderChildren } from 'claude-code'
 
 import type {} from '../types/index'
 import type { Cell } from './format'
-import { BAR_HEIGHT_PX, BAR_WIDTH_PX, DEFAULT_LANG, barAlt, barSvg, columnWidths, isLang, partsOf, rowsFor } from './format'
+import { BAR_HEIGHT_PX, BAR_WIDTH_PX, DEFAULT_LANG, RESET_ICON_PX, barAlt, barSvg, columnWidths, isLang, partsOf, resetAlt, resetIconSvg, resetTime, rowsFor } from './format'
 import { providers } from './providers'
 import { pullFromStore, put, refreshDue } from './readings'
 
@@ -45,31 +45,55 @@ export const register: Register = (on, options) => {
     const rows = rowsFor(providers, value, await $.clock.now(), e.props.bodyColumns, e.props.maxRows, lastAttempts, lang)
     const widths = columnWidths(rows)
     const { Box, Text } = $.ui.resolve(e)
-    const textOf = (text: string, color?: 'error') =>
-      color ? <Text color={color} wrap="truncate-end">{text}</Text> : <Text dimColor wrap="truncate-end">{text}</Text>
+    const textOf = (text: string) => <Text dimColor wrap="truncate-end">{text}</Text>
+    // 값은 고정폭으로 그려 위아래 열이 맞게 한다. 앞의 빈칸이 합쳐지지 않게 줄바꿈 없는 공백으로 바꾼다.
+    const monoOf = (text: string, color: 'error' | undefined, isStrong: boolean) => {
+      const shown = text.replaceAll(' ', '\u00a0')
+      if (color) return <Text mono color={color} wrap="truncate-end" {...(isStrong ? { weight: 'bold' as const } : {})}>{shown}</Text>
+      return isStrong ? <Text mono wrap="truncate-end">{shown}</Text> : <Text mono dimColor wrap="truncate-end">{shown}</Text>
+    }
 
     const rowOf = (cells: Cell[]) => {
       if (e.surface === 'terminal' || !cells.some(c => c.bar)) {
         // 바깥 Text를 흐리게 하면 안쪽 색까지 흐려지므로, 흐림은 조각마다 건다.
         return (
-          <Text wrap="truncate-end">
-            {partsOf(cells, widths).map(p => (p.color ? <Text color={p.color}>{p.text}</Text> : <Text dimColor>{p.text}</Text>))}
+          <Text mono wrap="truncate-end">
+            {partsOf(cells, widths).map(p =>
+              p.color ? <Text color={p.color} {...(p.isStrong ? { weight: 'bold' as const } : {})}>{p.text}</Text>
+              : p.isStrong ? <Text>{p.text}</Text>
+              : <Text dimColor>{p.text}</Text>,
+            )}
           </Text>
         )
       }
       const { Svg } = $.ui.resolve(e)
       // 여러 줄일 때만 최소 폭을 줘 위아래를 맞춘다. 줄 끝의 값은 주지 않는다.
-      // 칸 수는 고정폭 글꼴 기준이고 앱의 글자는 비례폭이라, 폭을 고정하면 넓은 글자가 많은 값이 잘린다.
+      // 칸 수는 고정폭 글꼴 기준이고 이름은 비례폭이라, 폭을 고정하면 넓은 글자가 많은 값이 잘린다.
       const sized = (node: RenderChildren, width: number | undefined) =>
-        rows.length > 1 && width !== undefined ? <Box minWidth={width}>{node}</Box> : node
+        rows.length > 1 && width ? <Box minWidth={width}>{node}</Box> : node
       return (
         <Box flexDirection="row" alignItems="center" columnGap={1}>
-          {cells.flatMap((c, j) => [
-            ...(j ? [textOf('·')] : []),
-            sized(textOf(c.label), widths.label[j]),
-            ...(c.bar ? [<Svg source={barSvg(c.bar, c.color)} alt={barAlt(c.bar, lang)} width={BAR_WIDTH_PX} height={BAR_HEIGHT_PX} />] : []),
-            sized(textOf(c.value, c.color), j < cells.length - 1 ? widths.value[j] : undefined),
-          ])}
+          {cells.flatMap((c, j) => {
+            const isLast = j === cells.length - 1
+            return [
+              ...(j ? [textOf('│')] : []),
+              ...(c.source !== undefined ? [sized(textOf(c.source), widths.source[j])] : []),
+              ...(widths.label[j] ? [sized(textOf(c.label), widths.label[j])] : []),
+              ...(c.bar ? [<Svg source={barSvg(c.bar, c.color)} alt={barAlt(c.bar, lang)} width={BAR_WIDTH_PX} height={BAR_HEIGHT_PX} />] : []),
+              sized(monoOf(c.value, c.color, true), isLast && !c.reset ? undefined : widths.value[j]),
+              ...(c.reset
+                ? [
+                    sized(
+                      <Box flexDirection="row" alignItems="center" columnGap={1}>
+                        <Svg source={resetIconSvg(c.color)} alt={resetAlt(lang)} width={RESET_ICON_PX} height={RESET_ICON_PX} />
+                        {monoOf(resetTime(c.reset), c.color, false)}
+                      </Box>,
+                      isLast ? undefined : widths.reset[j],
+                    ),
+                  ]
+                : []),
+            ]
+          })}
         </Box>
       )
     }

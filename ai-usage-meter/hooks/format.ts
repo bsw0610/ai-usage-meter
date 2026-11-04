@@ -6,22 +6,23 @@ type Trouble = 'failed' | 'missing' | 'stale'
 
 type Entry = { label: string; short?: string; reading: Reading | null | undefined; trouble?: Trouble }
 
-// 줄의 한 조각. color가 있으면 그 색으로, 없으면 흐리게 그린다.
-export type Part = { text: string; color?: 'error' }
+// 줄의 한 조각. 기본은 흐리게 그린다. isStrong은 사용률처럼 먼저 읽혀야 하는 값이고,
+// color와 함께면 위험 표시라 굵게 그린다.
+export type Part = { text: string; color?: 'error'; isStrong?: boolean }
 
 export type Bar = { percent: number }
 
 // 한도 하나의 표시. Svg를 그리는 표면은 칸별로, 터미널은 한 줄로 합쳐 그린다.
-export type Cell = { label: string; bar?: Bar; value: string; color?: Part['color'] }
+// source: 소스 이름(줄의 첫 칸). label: 한도 이름. value: 사용률이나 줄표. reset: 리셋까지 남은 시간.
+export type Cell = { source?: string; label: string; bar?: Bar; value: string; reset?: string; color?: Part['color'] }
 
-type Step = { hasBar?: boolean; detail?: 'full' | 'exact' | 'hours'; isShort?: boolean }
+type Step = { hasBar?: boolean; detail?: 'exact' | 'hours'; isShort?: boolean; hasNoSlot?: boolean }
 
 // 넓은 순서. 앞에서부터 들어맞는 첫 단계를 쓰고, 어느 것도 안 맞으면 마지막 단계를 쓴다(끝은 Text가 자른다).
 const STEPS: Step[] = [
-  { hasBar: true, detail: 'full' },
   { hasBar: true, detail: 'exact' },
   { hasBar: true, detail: 'hours' },
-  { detail: 'full' },
+  { detail: 'exact' },
   { detail: 'hours' },
   { detail: 'hours', isShort: true },
   { isShort: true },
@@ -29,6 +30,11 @@ const STEPS: Step[] = [
 
 const DASH = '—'
 const RED_FROM_PERCENT = 90
+const DANGER_MARK = '!' // 색을 구별하기 어려워도 위험을 알 수 있게 한다
+const RESET_MARK = '↻'
+const SEPARATOR = '│'
+const FIVE_HOUR_NAME = '5h'
+const PERCENT_SLOT = 4 // "100%"까지 자릿수가 바뀌어도 뒤의 값이 움직이지 않는다
 const BAR_CELLS = 10
 
 export type Lang = 'ko' | 'en' | 'ja'
@@ -40,36 +46,32 @@ export const isLang = (value: unknown): value is Lang => value === 'ko' || value
 
 type Strings = {
   trouble: Record<Trouble, string>
-  reset: (time: string) => string
   days: (days: number, hours: number) => string
-  weekly: string
   weeklyShort: string
+  resets: string
   used: (percent: number) => string
 }
 
 const STRINGS: Record<Lang, Strings> = {
   ko: {
     trouble: { failed: '실패', missing: '미설치', stale: '오래됨' },
-    reset: time => `(리셋 ${time})`,
     days: (days, hours) => `${days}일${hours ? ` ${hours}시간` : ''}`,
-    weekly: '주간',
     weeklyShort: '주',
+    resets: '리셋',
     used: percent => `${percent}% 사용`,
   },
   en: {
     trouble: { failed: 'failed', missing: 'not installed', stale: 'stale' },
-    reset: time => `(resets ${time})`,
     days: (days, hours) => `${days}d${hours ? ` ${hours}h` : ''}`,
-    weekly: 'Weekly',
     weeklyShort: 'Wk',
+    resets: 'resets',
     used: percent => `${percent}% used`,
   },
   ja: {
     trouble: { failed: '失敗', missing: '未インストール', stale: '古い値' },
-    reset: time => `(リセット ${time})`,
     days: (days, hours) => `${days}日${hours ? `${hours}時間` : ''}`,
-    weekly: '週間',
     weeklyShort: '週',
+    resets: 'リセット',
     used: percent => `${percent}%使用`,
   },
 }
@@ -138,25 +140,41 @@ export function barSvg({ percent }: Bar, color?: Part['color']): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${BAR_WIDTH_PX}" height="${BAR_HEIGHT_PX}" viewBox="0 0 ${BAR_WIDTH_PX} ${BAR_HEIGHT_PX}">${line(at(0), at(1), BAR_TRACK)}${fill}</svg>`
 }
 
+export const RESET_ICON_PX = 14
+const RESET_ICON_COLOR = 'rgba(140,140,140,0.95)' // 밝은 화면과 어두운 화면 모두에서 흐린 글자처럼 보이는 색
+
+// 앱의 글꼴로 그린 ↻는 작고 크기도 바꿀 수 없어, 데스크톱에서는 아이콘으로 그린다.
+export function resetIconSvg(color?: Part['color']): string {
+  const stroke = color ? BAR_COLORS[color] : RESET_ICON_COLOR
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${RESET_ICON_PX}" height="${RESET_ICON_PX}" viewBox="0 0 24 24" fill="none" stroke="${stroke}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19.36 16.25A8.5 8.5 0 1 1 18 6l2.5 2.5"/><path d="M20.5 3.5v5h-5"/></svg>`
+}
+
+// Cell.reset에서 문자 표시를 뺀 시간. 아이콘 옆에 쓴다.
+export const resetTime = (reset: string): string => reset.slice(RESET_MARK.length + 1)
+
+export const resetAlt = (lang: Lang = DEFAULT_LANG): string => STRINGS[lang].resets
+
 export const barAlt = ({ percent }: Bar, lang: Lang = DEFAULT_LANG): string => STRINGS[lang].used(Math.round(percent))
 
-function limitCell(r: PercentLimit, now: number, step: Step, text: Strings): Omit<Cell, 'label'> {
+function limitCell(r: PercentLimit, now: number, step: Step, text: Strings): Omit<Cell, 'label' | 'source'> {
+  const slot = (value: string) => (step.isShort || step.hasNoSlot ? value : value.padStart(PERCENT_SLOT))
   const left = r.resetsAt === undefined ? undefined : r.resetsAt - now
   // 리셋 시각이 지난 창은 새 창이 열린 것이므로 0%.
-  if (left !== undefined && left <= 0) return { ...(step.hasBar ? { bar: { percent: 0 } } : {}), value: '0%' }
+  if (left !== undefined && left <= 0) return { ...(step.hasBar ? { bar: { percent: 0 } } : {}), value: slot('0%') }
 
   const shown = Math.round(r.percent)
-  const percent = `${shown}%`
-  const tail =
+  const isDanger = shown >= RED_FROM_PERCENT
+  const time =
     left === undefined ? undefined
-    : step.detail === 'full' ? text.reset(until(left, text))
     : step.detail === 'exact' ? until(left, text)
     : step.detail === 'hours' ? until(left)
     : undefined
   return {
     ...(step.hasBar ? { bar: { percent: r.percent } } : {}),
-    value: tail ? `${percent} ${tail}` : percent,
-    ...(shown >= RED_FROM_PERCENT ? { color: 'error' as const } : {}),
+    // 슬롯은 %까지만 맞추고 표시는 그 뒤에 붙인다. 표시가 있는 동안에만 열이 넓어진다.
+    value: `${slot(`${shown}%`)}${isDanger ? DANGER_MARK : ''}`,
+    ...(time ? { reset: `${RESET_MARK} ${time}` } : {}),
+    ...(isDanger ? { color: 'error' as const } : {}),
   }
 }
 
@@ -168,35 +186,42 @@ function isMoreUrgent(a: PercentLimit, b: PercentLimit, now: number): boolean {
 
 // 소스 하나의 칸들. 나란히 놓을 수 없으면 더 급한 한도 하나만 남긴다.
 function cellsOf(e: Entry, now: number, step: Step, isStacked: boolean, text: Strings): Cell[] {
-  const label = step.isShort ? (e.short ?? e.label) : e.label
+  const source = step.isShort ? (e.short ?? e.label) : e.label
   const r = e.reading
-  if (!r) return [{ label, value: step.detail && e.trouble ? `${DASH} ${text.trouble[e.trouble]}` : DASH }]
+  if (!r) return [{ source, label: '', value: step.detail && e.trouble ? `${DASH} ${text.trouble[e.trouble]}` : DASH }]
   if (r.kind === 'count') {
     const count = shortCount(r.count)
-    return [{ label, value: step.isShort ? count : `${count} ${r.unit}` }]
+    return [{ source, label: '', value: step.isShort ? count : `${count} ${r.unit}` }]
   }
-  const weeklyName = step.isShort ? text.weeklyShort : text.weekly
-  const primary = { label: r.isWeekly ? `${label} ${weeklyName}` : label, ...limitCell(r, now, step, text) }
-  // 따로 잡히는 한도는 막대 없이 그린다. 줄이 길어 분 단위가 먼저 사라지는 일을 막고, 위험은 빨간색으로 보인다.
+  // 가장 좁을 때는 첫 칸이 5시간 한도라는 것을 이름 없이 둔다.
+  const firstName = r.isWeekly ? text.weeklyShort : step.isShort ? '' : FIVE_HOUR_NAME
+  const primary = { source, label: firstName, ...limitCell(r, now, step, text) }
+  // 따로 잡히는 한도는 막대와 슬롯 없이 그린다. 줄이 길어 분 단위가 먼저 사라지는 일을 막고, 위험은 빨간색과 표시로 보인다.
   const others: { name: string; limit: PercentLimit; step: Step }[] = [
-    ...(r.secondary ? [{ name: weeklyName, limit: r.secondary, step }] : []),
-    ...(r.extra ? [{ name: step.isShort ? r.extra.short : r.extra.label, limit: r.extra, step: { ...step, hasBar: false } }] : []),
+    ...(r.secondary ? [{ name: text.weeklyShort, limit: r.secondary, step }] : []),
+    ...(r.extra ? [{ name: r.extra.short, limit: r.extra, step: { ...step, hasBar: false, hasNoSlot: true } }] : []),
   ]
   if (isStacked) return [primary, ...others.map(o => ({ label: o.name, ...limitCell(o.limit, now, o.step, text) }))]
   let urgent: (typeof others)[number] | undefined
   for (const o of others) if (isMoreUrgent(o.limit, urgent?.limit ?? r, now)) urgent = o
-  return [urgent ? { label: `${label} ${urgent.name}`, ...limitCell(urgent.limit, now, urgent.step, text) } : primary]
+  if (!urgent) return [primary]
+  return [{ source, label: urgent.limit === r.extra ? r.extra.label : urgent.name, ...limitCell(urgent.limit, now, urgent.step, text) }]
 }
 
-// 여러 줄일 때 위아래가 맞도록, 칸 번호별로 이름과 값의 폭을 잰다.
-export type ColumnWidths = { label: number[]; value: number[] }
+// 여러 줄일 때 위아래가 맞도록, 칸 번호별로 조각의 폭을 잰다.
+export type ColumnWidths = { source: number[]; label: number[]; value: number[]; reset: number[] }
 
 export function columnWidths(rows: Cell[][]): ColumnWidths {
-  const widths: ColumnWidths = { label: [], value: [] }
+  const widths: ColumnWidths = { source: [], label: [], value: [], reset: [] }
+  const grow = (column: number[], j: number, text = '') => {
+    column[j] = Math.max(column[j] ?? 0, displayWidth(text))
+  }
   for (const cells of rows) {
     cells.forEach((c, j) => {
-      widths.label[j] = Math.max(widths.label[j] ?? 0, displayWidth(c.label))
-      widths.value[j] = Math.max(widths.value[j] ?? 0, displayWidth(c.value))
+      grow(widths.source, j, c.source)
+      grow(widths.label, j, c.label)
+      grow(widths.value, j, c.value)
+      grow(widths.reset, j, c.reset)
     })
   }
   return widths
@@ -204,18 +229,23 @@ export function columnWidths(rows: Cell[][]): ColumnWidths {
 
 const padTo = (text: string, width = 0) => text + ' '.repeat(Math.max(0, width - displayWidth(text)))
 
-// 색이 없는 조각은 이어 붙여, 그릴 Text 수를 줄인다. 줄 끝의 값은 채우지 않는다.
+// 흐린 조각은 이어 붙여, 그릴 Text 수를 줄인다. 줄 끝의 값은 채우지 않는다.
 export function partsOf(cells: Cell[], widths: ColumnWidths = columnWidths([cells])): Part[] {
   const parts: Part[] = []
   const add = (p: Part) => {
     const last = parts.at(-1)
-    if (last && !last.color && !p.color) last.text += p.text
+    if (last && !last.color && !p.color && !last.isStrong && !p.isStrong) last.text += p.text
     else parts.push({ ...p })
   }
+  const named = (text: string, width = 0) => (width ? `${padTo(text, width)} ` : '')
   cells.forEach((c, j) => {
-    const value = j < cells.length - 1 ? padTo(c.value, widths.value[j]) : c.value
-    add({ text: `${j ? ' · ' : ''}${padTo(c.label, widths.label[j])} ` })
-    add({ text: c.bar ? `${barText(c.bar)} ${value}` : value, ...(c.color ? { color: c.color } : {}) })
+    const isLast = j === cells.length - 1
+    const resetWidth = widths.reset[j] ?? 0
+    add({ text: `${j ? ` ${SEPARATOR} ` : ''}${named(c.source ?? '', widths.source[j])}${named(c.label, widths.label[j])}` })
+    if (c.bar) add({ text: `${barText(c.bar)} `, ...(c.color ? { color: c.color } : {}) })
+    add({ text: isLast && !c.reset ? c.value : padTo(c.value, widths.value[j]), isStrong: true, ...(c.color ? { color: c.color } : {}) })
+    if (c.reset) add({ text: ` ${isLast ? c.reset : padTo(c.reset, resetWidth)}`, ...(c.color ? { color: c.color } : {}) })
+    else if (!isLast && resetWidth) add({ text: ' '.repeat(resetWidth + 1) })
   })
   return parts
 }

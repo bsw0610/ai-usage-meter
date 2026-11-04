@@ -122,7 +122,7 @@ test("another session's attempt and reading are taken up at the next tick", asyn
 
   await clock.advance(MIN)
   expect(calls.agy).toBe(1)
-  expect(await line($)).toBe('Cx 31% · AG 40%')
+  expect(await line($)).toBe('Cx 31% │ AG 40%')
 })
 
 test('a store write never brings back an older value from this session', async ($, on) => {
@@ -142,14 +142,14 @@ test('a store write never brings back an older value from this session', async (
 test('a failure keeps the last value through its lifetime, then a dash', async ($, on) => {
   const { clock, mode } = world(on)
   await start($, clock)
-  expect(await line($)).toBe('Cx 31% · AG 25%')
+  expect(await line($)).toBe('Cx 31% │ AG 25%')
 
   mode.codex = 'fail'
   await clock.advance(5 * MIN)
-  expect(await line($)).toBe('Cx 31% · AG 25%') // 3분 조회는 실패, 값은 아직 유효
+  expect(await line($)).toBe('Cx 31% │ AG 25%') // 3분 조회는 실패, 값은 아직 유효
 
   await clock.advance(2 * MIN)
-  expect(await line($)).toBe('Cx — · AG 25%') // 수명(조회 간격의 2배) 초과
+  expect(await line($)).toBe('Cx — │ AG 25%') // 수명(조회 간격의 2배) 초과
 })
 
 test('a stored value past its lifetime is not shown on a new start', async ($, on) => {
@@ -161,7 +161,7 @@ test('a stored value past its lifetime is not shown on a new start', async ($, o
     },
   })
   await start($, clock)
-  expect(await line($)).toBe('Cx — · AG 9%')
+  expect(await line($)).toBe('Cx — │ AG 9%')
 })
 
 test('an attempt stored as a bare number by an older version still counts', async ($, on) => {
@@ -184,7 +184,7 @@ test('an old value read from the log just now is shown, not treated as expired',
       },
     }) + '\n'
   await start($, clock)
-  expect(await line($)).toBe('Cx 22% · AG 25%')
+  expect(await line($)).toBe('Cx 22% │ AG 25%')
 })
 
 test('values an older version keeps writing are not read back', async ($, on) => {
@@ -223,7 +223,7 @@ test('a failure leaves its reason in the store, and the band says it failed', as
   expect(attempts.codex.error).toContain('helper exit 1: timeout')
   expect(attempts.codex.error).toContain('log:')
   expect(attempts.gemini.error).toContain('agy: ')
-  expect(await wide($)).toBe('Codex — failed · Gemini(AG) — failed')
+  expect(await wide($)).toBe('Codex — failed │ Gemini(AG) — failed')
 })
 
 test('a program that is not there reads as not installed', async ($, on) => {
