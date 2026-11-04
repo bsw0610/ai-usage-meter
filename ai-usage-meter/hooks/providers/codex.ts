@@ -21,7 +21,7 @@ async function readLive(io: Io, now: number): Promise<Reading> {
   }
   if (r.exitCode !== 0) throw new ReadFailure(`helper exit ${r.exitCode}: ${r.stderr.trim()}`, r.exitCode === EXIT_NO_CODEX)
   const reading = parseLive(r.stdout, now)
-  if (!reading) throw new ReadFailure('helper: 출력 모양이 다름')
+  if (!reading) throw new ReadFailure('helper: unexpected output')
   return reading
 }
 
@@ -85,6 +85,6 @@ export const codex: Provider = {
     }
     const log = await readLog(io, now)
     if (log) return log
-    throw new ReadFailure(`${live.message}; log: ${log === null ? 'rate_limits 없음' : 'token_count 없음'}`, live.isMissing)
+    throw new ReadFailure(`${live.message}; log: ${log === null ? 'no rate_limits' : 'no token_count'}`, live.isMissing)
   },
 }

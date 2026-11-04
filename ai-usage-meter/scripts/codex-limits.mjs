@@ -44,7 +44,7 @@ child.stdout.on('data', d => {
       send({ id: 2, method: 'account/rateLimits/read' })
     } else if (m.id === 2) {
       const r = m.result?.rateLimitsByLimitId?.codex ?? m.result?.rateLimits
-      if (!r || r.limitId !== 'codex') return fail('codex 한도 없음')
+      if (!r || r.limitId !== 'codex') return fail('no codex limits')
       process.stdout.write(
         JSON.stringify({ limitId: 'codex', windows: [pick(r.primary), pick(r.secondary)].filter(Boolean) }) + '\n',
         () => {

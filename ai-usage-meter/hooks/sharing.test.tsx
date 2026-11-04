@@ -206,7 +206,7 @@ test('values an older version keeps writing are not read back', async ($, on) =>
 
 async function wide($: any) {
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal', props: { ...BAND.props, bodyColumns: 200 } })
-  const text: string | undefined = (await ui.find({ type: 'Text', text: /Codex/ }))?.text
+  const text: string | undefined = (await ui.find({ type: 'Text', text: /Codex|Gemini/ }))?.text
   await ui.unmount()
   return text
 }
@@ -226,13 +226,43 @@ test('a failure leaves its reason in the store, and the band says it failed', as
   expect(await wide($)).toBe('Codex — failed │ Gemini(AG) — failed')
 })
 
-test('a program that is not there reads as not installed', async ($, on) => {
+test('a program that is not there hides its row, and the row returns once it is installed', async ($, on) => {
   const { clock, mode, store } = world(on)
   mode.codex = 'fail'
   mode.codexExit = 2
   await start($, clock)
   expect((store['attempts-v5'] as any).codex.isMissing).toBe(true)
-  expect(await wide($)).toContain('Codex — not installed')
+  expect(await wide($)).toContain('Gemini(AG)')
+  expect(await wide($)).not.toContain('Codex')
+
+  mode.codex = 'ok'
+  await clock.advance(3 * MIN + 30_000)
+  expect(await wide($)).toContain('Codex')
+})
+
+test('with none of the programs installed, the band says so', async ($, on) => {
+  const gemini = { at: NOW, isOk: false, error: 'spawn agy ENOENT', isMissing: true }
+  const { clock, mode } = world(on, { 'attempts-v5': { gemini } })
+  mode.codex = 'fail'
+  mode.codexExit = 2
+  await start($, clock)
+  expect(await wide($)).toBe('Codex — not installed │ Gemini(AG) — not installed')
+})
+
+test('a source can be turned off: nothing runs for it and it has no row', { options: { sources: 'codex' } }, async ($, on) => {
+  const { clock, calls } = world(on)
+  await start($, clock)
+  expect(calls.agy).toBe(0)
+  expect(calls.node).toBe(1)
+  expect(await wide($)).toContain('Codex')
+  expect(await wide($)).not.toContain('Gemini(AG)')
+})
+
+test('a sources value not on the list keeps every source', { options: { sources: 'nope' } }, async ($, on) => {
+  const { clock, calls } = world(on)
+  await start($, clock)
+  expect(calls.agy).toBe(1)
+  expect(await wide($)).toContain('Gemini(AG)')
 })
 
 test('a very long reason is cut before it is stored', async ($, on) => {
@@ -247,7 +277,7 @@ test("another session's failure and its reason survive the store", async ($, on)
   const failed = { at: NOW, isOk: false, error: 'spawn agy ENOENT', isMissing: true }
   const { clock, store } = world(on, { 'attempts-v5': { gemini: failed } })
   await start($, clock)
-  expect(await wide($)).toContain('Gemini(AG) — not installed')
+  expect(await wide($)).not.toContain('Gemini(AG)')
   expect((store['attempts-v5'] as any).gemini).toEqual(failed)
 })
 

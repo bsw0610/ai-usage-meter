@@ -1,5 +1,7 @@
 # ai-usage-meter
 
+English | [日本語](README.ja.md)
+
 See your Codex and Antigravity usage limits while you work in Claude Code. This mod adds a small band above the prompt with how much of each limit you have used and when it resets.
 
 ![The band on the Claude Code desktop app in dark mode, with one row for ChatGPT Codex and one for Gemini in Antigravity](docs/band.png)
@@ -29,7 +31,7 @@ claude plugin install ai-usage-meter --marketplace bsw0610/ai-usage-meter
 | Codex | The `codex` CLI and Node.js on your `PATH`. Without them, the mod falls back to your recent logs in `~/.codex/sessions`. |
 | Antigravity | The `agy` CLI, signed in. Tested with 1.4.12. |
 
-If you only use one of them, the other row shows `—`.
+A source whose program isn't on the session's `PATH` gets no row, and its row comes back once the program is found. If neither is found, the band says so.
 
 ## Reading the band
 
@@ -58,21 +60,30 @@ Codex      5h ━━━━──────  41% ↻ 4h46m │ Wk ━━━━�
 Gemini(AG) 5h ━─────────  12% ↻ 2h31m │ Wk ━━━───────  30% ↻ 5d 18h │ Ar 3% ↻ 5d 18h
 ```
 
-## Language
+## Settings
 
-The band is in English by default, and also comes in Japanese and Korean. To change it, add this to `~/.claude/settings.json`, using `en`, `ja` or `ko`:
+| Option | Values | Default | Meaning |
+|---|---|---|---|
+| `language` | `en`, `ja`, `ko` | `en` | The language of the band |
+| `sources` | `all`, `codex`, `gemini` | `all` | The sources to look up and show. A source turned off runs nothing. |
+
+Set them when you install from a shell:
+
+```bash
+claude plugin install ai-usage-meter --marketplace bsw0610/ai-usage-meter --config language=ja --config sources=codex
+```
+
+To change them later, run `/plugin configure ai-usage-meter@claude-code-mods` in a terminal session, or edit `~/.claude/settings.json` and run `/reload-plugins` in the session:
 
 ```json
 {
   "pluginConfigs": {
     "ai-usage-meter@claude-code-mods": {
-      "options": { "language": "ja" }
+      "options": { "language": "ja", "sources": "codex" }
     }
   }
 }
 ```
-
-Then run `/reload-plugins` in the session.
 
 ## What it runs and keeps
 
