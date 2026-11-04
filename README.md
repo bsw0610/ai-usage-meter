@@ -11,7 +11,7 @@ See your Codex and Antigravity usage limits while you work in Claude Code. This 
 Type this at the prompt of a Claude Code terminal session:
 
 ```
-/plugin install ai-usage-meter --marketplace bsw0610/claude-code-mods
+/plugin install ai-usage-meter --marketplace bsw0610/ai-usage-meter
 ```
 
 Answer `y` to add the marketplace, then pick a scope.
@@ -19,7 +19,7 @@ Answer `y` to add the marketplace, then pick a scope.
 Or run it from a shell:
 
 ```bash
-claude plugin install ai-usage-meter --marketplace bsw0610/claude-code-mods
+claude plugin install ai-usage-meter --marketplace bsw0610/ai-usage-meter
 ```
 
 ## What you need
