@@ -9,7 +9,7 @@ const BAND = {
   plugin: 'ai-usage-meter',
   component: 'AbovePrompt',
   requestId: 'band',
-  props: { hasSurvey: false, isWorking: false, bodyColumns: 26, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
+  props: { hasSurvey: false, isWorking: false, bodyColumns: 12, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
 } as const
 
 const LIVE = JSON.stringify({ limitId: 'codex', windows: [{ usedPercent: 31, windowDurationMins: 300, resetsAt: SEC + 7200 }] })
@@ -50,7 +50,7 @@ async function start($: any, clock: { settle: () => Promise<void> }) {
 
 async function line($: any, surface: 'terminal' | 'desktop' = 'desktop') {
   const ui = await $.ui.mount({ ...BAND, surface })
-  const text: string | undefined = (await ui.find({ type: 'Text', text: /Codex/ }))?.text
+  const text: string | undefined = (await ui.find({ type: 'Text', text: /Cx/ }))?.text
   await ui.unmount()
   return text
 }
@@ -75,21 +75,21 @@ test('drawing the band never queries anything', async ($, on) => {
     for (let i = 0; i < 3; i++) await line($, surface)
   }
   expect(calls).toEqual(before)
-  expect(await line($)).toBe('Codex 31% · Gemini(AG) 25%')
+  expect(await line($)).toBe('Cx 31% · AG 25%')
 })
 
 test('one source failing leaves the other intact, on both surfaces', async ($, on) => {
   const { clock } = world(on, { codex: 'ok', agy: 'fail' })
   await start($, clock)
   for (const surface of ['terminal', 'desktop'] as const) {
-    expect(await line($, surface)).toBe('Codex 31% · Gemini(AG) —')
+    expect(await line($, surface)).toBe('Cx 31% · AG —')
   }
 })
 
 test('the other way round: Codex failing leaves Gemini intact', async ($, on) => {
   const { clock } = world(on, { codex: 'fail', agy: 'ok' })
   await start($, clock)
-  expect(await line($)).toBe('Codex — · Gemini(AG) 25%')
+  expect(await line($)).toBe('Cx — · AG 25%')
 })
 
 test('a failed Gemini is not retried for thirty minutes; Codex keeps its three', async ($, on) => {
@@ -112,7 +112,7 @@ test('a recent attempt from an earlier session is respected on a new start', asy
   })
   await start($, clock)
   expect(calls).toEqual({ node: 0, agy: 0 })
-  expect(await line($)).toBe('Codex 9% · Gemini(AG) —')
+  expect(await line($)).toBe('Cx 9% · AG —')
 })
 
 test('after the three minutes of an old attempt the source is queried', async ($, on) => {

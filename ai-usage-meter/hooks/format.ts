@@ -23,7 +23,7 @@ const STEPS: Step[] = [
   { hasBar: true, detail: 'hours' },
   { detail: 'full' },
   { detail: 'hours' },
-  {},
+  { detail: 'hours', isShort: true },
   { isShort: true },
 ]
 
@@ -145,7 +145,8 @@ function limitCell(r: PercentLimit, now: number, step: Step, text: Strings): Omi
   // 리셋 시각이 지난 창은 새 창이 열린 것이므로 0%.
   if (left !== undefined && left <= 0) return { ...(step.hasBar ? { bar: { percent: 0 } } : {}), value: '0%' }
 
-  const percent = `${Math.round(r.percent)}%`
+  const shown = Math.round(r.percent)
+  const percent = `${shown}%`
   const tail =
     left === undefined ? undefined
     : step.detail === 'full' ? text.reset(until(left, text))
@@ -155,7 +156,7 @@ function limitCell(r: PercentLimit, now: number, step: Step, text: Strings): Omi
   return {
     ...(step.hasBar ? { bar: { percent: r.percent } } : {}),
     value: tail ? `${percent} ${tail}` : percent,
-    ...(r.percent >= RED_FROM_PERCENT ? { color: 'error' as const } : {}),
+    ...(shown >= RED_FROM_PERCENT ? { color: 'error' as const } : {}),
   }
 }
 

@@ -17,7 +17,7 @@ const BAND = {
   plugin: 'ai-usage-meter',
   component: 'AbovePrompt',
   requestId: 'band',
-  props: { hasSurvey: false, isWorking: false, bodyColumns: 30, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
+  props: { hasSurvey: false, isWorking: false, bodyColumns: 12, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
 } as const
 
 type Run = 'ok' | 'exit1' | 'throw' | 'garbage' | 'login' | 'argon'
@@ -51,21 +51,21 @@ async function shown($: any, clock: { settle: () => Promise<void> }, surface: 't
   await $.session.start({ cwd: '/', surface, isInteractive: true })
   await clock.settle()
   const ui = await $.ui.mount({ ...BAND, surface })
-  const text: string | undefined = (await ui.find({ type: 'Text', text: /Gemini/ }))?.text
+  const text: string | undefined = (await ui.find({ type: 'Text', text: /AG/ }))?.text
   await ui.unmount()
-  return text?.split(' · ').find(x => x.startsWith('Gemini'))
+  return text?.split(' · ').find(x => x.startsWith('AG'))
 }
 
 test('the Gemini five-hour window is shown as used percent, on both surfaces', async ($, on) => {
   const { clock, calls } = world(on, 'ok')
-  expect(await shown($, clock, 'terminal')).toBe('Gemini(AG) 25%')
+  expect(await shown($, clock, 'terminal')).toBe('AG 25%')
   expect(calls.find(a => a[0] === 'agy')).toEqual(['agy', '--print-timeout', '12s', '--output-format', 'json', '-p=/usage'])
 })
 
 for (const run of ['exit1', 'throw', 'garbage', 'login'] as const) {
   test(`agy ${run}: a dash, and the other source is unaffected`, async ($, on) => {
     const { clock } = world(on, run)
-    expect(await shown($, clock)).toBe('Gemini(AG) —')
+    expect(await shown($, clock)).toBe('AG —')
   })
 }
 
@@ -91,9 +91,9 @@ test('a failing agy does not blank Codex', async ($, on) => {
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   await clock.settle()
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  const text = (await ui.find({ type: 'Text', text: /Codex/ }))?.text
+  const text = (await ui.find({ type: 'Text', text: /Cx/ }))?.text
   await ui.unmount()
-  expect(text).toBe('Codex — · Gemini(AG) —')
+  expect(text).toBe('Cx — · AG —')
 })
 
 test('parseUsage: weekly is the fallback, remaining becomes used, other groups are ignored', () => {

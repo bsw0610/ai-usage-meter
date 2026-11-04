@@ -24,7 +24,7 @@ test('the line narrows step by step as the room shrinks', () => {
   const barHours = 'Codex ━━──────── 18% 2h · Gemini(AG) ━━╸─────── 25% 3h'
   const full = 'Codex 18% (resets 2h) · Gemini(AG) 25% (resets 3h)'
   const hours = 'Codex 18% 2h · Gemini(AG) 25% 3h'
-  const plain = 'Codex 18% · Gemini(AG) 25%'
+  const shortHours = 'Cx 18% 2h · AG 25% 3h'
   const short = 'Cx 18% · AG 25%'
   expect(formatLine(entries, NOW)).toBe(barFull)
   expect(formatLine(entries, NOW, displayWidth(barFull))).toBe(barFull)
@@ -33,9 +33,9 @@ test('the line narrows step by step as the room shrinks', () => {
   expect(formatLine(entries, NOW, displayWidth(full))).toBe(full)
   expect(formatLine(entries, NOW, displayWidth(full) - 1)).toBe(hours)
   expect(formatLine(entries, NOW, displayWidth(hours))).toBe(hours)
-  expect(formatLine(entries, NOW, displayWidth(hours) - 1)).toBe(plain)
-  expect(formatLine(entries, NOW, displayWidth(plain))).toBe(plain)
-  expect(formatLine(entries, NOW, displayWidth(plain) - 1)).toBe(short)
+  expect(formatLine(entries, NOW, displayWidth(hours) - 1)).toBe(shortHours)
+  expect(formatLine(entries, NOW, displayWidth(shortHours))).toBe(shortHours)
+  expect(formatLine(entries, NOW, displayWidth(shortHours) - 1)).toBe(short)
   expect(formatLine(entries, NOW, 3)).toBe(short) // 더 줄일 수 없으면 Text가 끝을 자른다
 })
 
@@ -118,7 +118,6 @@ test('the bar keeps ten cells', () => {
 
 test('the color turns red from 90%, not before', () => {
   expect(colorOf(percent(89, HOUR))).toBeUndefined()
-  expect(colorOf(percent(89.9, HOUR))).toBeUndefined()
   expect(colorOf(percent(90, HOUR))).toBe('error')
   expect(colorOf(percent(99, HOUR))).toBe('error')
   expect(colorOf(percent(95, -HOUR))).toBeUndefined() // 리셋이 지난 창은 0%다
@@ -248,8 +247,8 @@ test('a dash says why at the widths that have room', () => {
   expect(at({ a: percent(9) }, failed)).toContain('9%')
 
   // 칸이 모자라면 줄표만 남긴다.
-  expect(at({}, failed, displayWidth('Alpha —'))).toBe('Alpha —')
-  expect(at({}, failed, displayWidth('A —'))).toBe('A —')
+  expect(at({}, failed, displayWidth('A — failed'))).toBe('A — failed')
+  expect(at({}, failed, displayWidth('A — failed') - 1)).toBe('A —')
 })
 
 test('a stored reading with no weekly limit still draws on one line', () => {
@@ -451,7 +450,7 @@ test('the band sizes its line to bodyColumns, on both surfaces', async ($, on) =
     [60, 'Codex ━━──────── 18% 2h · Gemini(AG) ━━╸─────── 25% 3h'],
     [50, 'Codex 18% (resets 2h) · Gemini(AG) 25% (resets 3h)'],
     [32, 'Codex 18% 2h · Gemini(AG) 25% 3h'],
-    [26, 'Codex 18% · Gemini(AG) 25%'],
+    [26, 'Cx 18% 2h · AG 25% 3h'],
     [15, 'Cx 18% · AG 25%'],
     [10, 'Cx 18% · AG 25%'],
   ])
@@ -490,7 +489,7 @@ test('at the width of a real window, every language keeps the third limit and th
 })
 
 test('a third limit never draws a bar, at any width', () => {
-  for (const w of [Infinity, 120, 85, 60, 40]) {
+  for (const w of [Infinity, 120, 85, 60]) {
     const cells = formatRows(withArgon, NOW, w)[1]!
     expect(cells[2]!.label).toBe('Argon')
     expect(cells[2]!.bar).toBeUndefined()
@@ -543,4 +542,20 @@ test('a weekly limit alone keeps saying so on one line, and with a third limit b
   const withThird = { ...weeklyOnly(54, 45 * HOUR), extra: argon(3, 6 * DAY) }
   expect(formatLine([{ label: 'A', reading: withThird }], NOW)).toBe('A Weekly ━━━━━╸──── 54% (resets 1d 21h) · Argon 3% (resets 6d)')
   expect(line({ ...withThird, extra: argon(95, 6 * DAY) })).toContain('A Argon ')
+})
+
+test('red follows the percent the band shows', () => {
+  const color = (p: number) => formatRows([{ label: 'A', reading: percent(p, HOUR) }], NOW)[0]![0]!.color
+  expect(color(89.4)).toBeUndefined()
+  expect(color(89.6)).toBe('error')
+})
+
+test('the reset outlives the long names as the room shrinks', () => {
+  const list = [
+    { label: 'Codex', short: 'Cx', reading: both(41, 4.75 * HOUR, 53, 21.2 * HOUR) },
+    { label: 'Gemini(AG)', short: 'AG', reading: { ...both(0, 5 * HOUR, 0, 7 * DAY), extra: argon(3, 6 * DAY) } },
+  ]
+  expect(formatLine(list, NOW, 40).split('\n')).toEqual(['Cx 41% 5h · Wk 53% 21h', 'AG 0% 5h  · Wk 0% 7d   · Ar 3% 6d'])
+  expect(formatLine(list, NOW, 33).split('\n')).toEqual(['Cx 41% 5h · Wk 53% 21h', 'AG 0% 5h  · Wk 0% 7d   · Ar 3% 6d'])
+  expect(formatLine(list, NOW, 32).split('\n')).toEqual(['Cx 41% · Wk 53%', 'AG 0%  · Wk 0%  · Ar 3%'])
 })

@@ -41,7 +41,7 @@ const BAND = {
   plugin: 'ai-usage-meter',
   component: 'AbovePrompt',
   requestId: 'band',
-  props: { hasSurvey: false, isWorking: false, bodyColumns: 30, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
+  props: { hasSurvey: false, isWorking: false, bodyColumns: 12, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
 } as const
 
 // 세션을 시작해 첫 조회를 돌리고, 밴드에 보이는 Codex 값을 돌려준다.
@@ -49,7 +49,7 @@ async function shown($: any, clock: { settle: () => Promise<void> }, surface: 't
   await $.session.start({ cwd: '/', surface, isInteractive: true })
   await clock.settle()
   const ui = await $.ui.mount({ ...BAND, surface })
-  const text: string | undefined = (await ui.find({ type: 'Text', text: /Codex/ }))?.text
+  const text: string | undefined = (await ui.find({ type: 'Text', text: /Cx/ }))?.text
   await ui.unmount()
   return text?.split(' · ')[0]?.replace(/ +/g, ' ')
 }
@@ -101,7 +101,7 @@ const one = (name: string, text: string) => ({ files: [{ name, size: 100 }], tex
 
 test('live helper wins over the log', async ($, on) => {
   const { ran, clock } = world(on, { live: 'ok', ...one(F, tokenCount(limits(win(5, 300, 100), null))) })
-  expect(await shown($, clock)).toBe('Codex 31%')
+  expect(await shown($, clock)).toBe('Cx 31%')
   expect(ran.filter(a => a[0] === 'node').length).toBe(1)
   expect(ran.some(a => a[0] === 'tail')).toBe(false)
 })
@@ -109,14 +109,14 @@ test('live helper wins over the log', async ($, on) => {
 for (const live of ['exit1', 'throw', 'garbage'] as const) {
   test(`helper ${live}: the log is used`, async ($, on) => {
     const { clock } = world(on, { live, ...one(F, tokenCount(limits(win(18, 300, 3600), win(30, 10080, 90000)))) })
-    expect(await shown($, clock)).toBe('Codex 18%')
+    expect(await shown($, clock)).toBe('Cx 18%')
   })
 }
 
 test('no log folder and no helper: a dash, on both surfaces', async ($, on) => {
   const { clock } = world(on, { noFolders: true })
-  expect(await shown($, clock, 'terminal')).toBe('Codex —')
-  expect(await shown($, clock, 'desktop')).toBe('Codex —')
+  expect(await shown($, clock, 'terminal')).toBe('Cx —')
+  expect(await shown($, clock, 'desktop')).toBe('Cx —')
 })
 
 test('a corrupt line is skipped and the last valid token_count is used', async ($, on) => {
@@ -127,13 +127,13 @@ test('a corrupt line is skipped and the last valid token_count is used', async (
     tokenCount(limits(win(22, 300, 100), null), '2026-11-04T09:30:00Z'),
   ].join('\n')
   const { clock } = world(on, one(F, text))
-  expect(await shown($, clock)).toBe('Codex 22%')
+  expect(await shown($, clock)).toBe('Cx 22%')
 })
 
 test('null rate_limits is unknown, never 0%', async ($, on) => {
   const text = tokenCount(limits(win(50, 300, 100), null)) + '\n' + tokenCount(null)
   const { clock } = world(on, one(F, text))
-  expect(await shown($, clock)).toBe('Codex —')
+  expect(await shown($, clock)).toBe('Cx —')
 })
 
 test('windows are told apart by length, not by name; other limit ids are ignored', async ($, on) => {
@@ -142,21 +142,21 @@ test('windows are told apart by length, not by name; other limit ids are ignored
     tokenCount(limits(win(99, 300, 1000), null, 'codex_other')),
   ].join('\n')
   const { clock } = world(on, one(F, text))
-  expect(await shown($, clock)).toBe('Codex 12%')
+  expect(await shown($, clock)).toBe('Cx 12%')
 })
 
 test('only a 7-day window falls back to it', async ($, on) => {
   const { clock } = world(on, one(F, tokenCount(limits(win(61, 10080, 90000), null))))
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   await clock.settle()
-  const ui = await $.ui.mount({ ...BAND, surface: 'desktop', props: { ...BAND.props, bodyColumns: 31 } })
-  expect((await ui.find({ type: 'Text', text: /Codex/ }))?.text).toBe('Codex Weekly 61% · Gemini(AG) —')
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop', props: { ...BAND.props, bodyColumns: 12 } })
+  expect((await ui.find({ type: 'Text', text: /Cx/ }))?.text).toBe('Cx Wk 61% · AG —')
   await ui.unmount()
 })
 
 test('a window whose reset time has passed is shown as 0%', async ($, on) => {
   const { clock } = world(on, one(F, tokenCount(limits(win(80, 300, -60), null))))
-  expect(await shown($, clock)).toBe('Codex 0%')
+  expect(await shown($, clock)).toBe('Cx 0%')
 })
 
 test('a file over 4 MiB is read through tail, and yesterday is checked too', async ($, on) => {
@@ -165,7 +165,7 @@ test('a file over 4 MiB is read through tail, and yesterday is checked too', asy
     files: [{ name: big, size: 5 * 1024 * 1024, dir: 1 }],
     texts: { [pathOf(big, 1)]: tokenCount(limits(win(33, 300, 500), null)) },
   })
-  expect(await shown($, clock)).toBe('Codex 33%')
+  expect(await shown($, clock)).toBe('Cx 33%')
   expect(ran.find(a => a[0] === 'tail')?.slice(0, 3)).toEqual(['tail', '-c', '262144'])
 })
 
@@ -177,7 +177,7 @@ test('the newest file without a token_count is passed over', async ($, on) => {
       [pathOf('rollout-old.jsonl')]: tokenCount(limits(win(7, 300, 100), null)),
     },
   })
-  expect(await shown($, clock)).toBe('Codex 7%')
+  expect(await shown($, clock)).toBe('Cx 7%')
 })
 
 test('parseRollout: nothing found is undefined, not null', () => {
