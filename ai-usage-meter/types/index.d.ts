@@ -4,9 +4,10 @@ export type PercentLimit = { percent: number; resetsAt?: number }
 // 5시간·주간과 따로 잡히는 한도(Argon 등). 표시 이름은 소스가 정한다.
 export type NamedLimit = PercentLimit & { label: string; short: string }
 
-// observedAt: epoch milliseconds. secondary: 5시간 한도와 함께 오는 주간 한도. extra: 따로 잡히는 한도
+// observedAt: epoch milliseconds. secondary: 5시간 한도와 함께 오는 주간 한도. extra: 따로 잡히는 한도.
+// isWeekly: 5시간 한도가 없어 percent가 주간 한도의 값이다.
 export type Reading =
-  | (PercentLimit & { kind: 'percent'; observedAt: number; secondary?: PercentLimit; extra?: NamedLimit })
+  | (PercentLimit & { kind: 'percent'; observedAt: number; secondary?: PercentLimit; extra?: NamedLimit; isWeekly?: boolean })
   | { kind: 'count'; count: number; unit: string; observedAt: number }
 
 // at: epoch milliseconds. error: 실패 이유(저장 파일에서 읽는 진단용으로, 밴드에는 그리지 않는다).

@@ -97,7 +97,7 @@ test('a failing agy does not blank Codex', async ($, on) => {
 })
 
 test('parseUsage: weekly is the fallback, remaining becomes used, other groups are ignored', () => {
-  expect(parseUsage(envelope(group('Gemini Models', bucket('weekly', 0.9, WEEK_RESET))), NOW)).toEqual({ kind: 'percent', percent: 10, resetsAt: Date.parse(WEEK_RESET), observedAt: NOW })
+  expect(parseUsage(envelope(group('Gemini Models', bucket('weekly', 0.9, WEEK_RESET))), NOW)).toEqual({ kind: 'percent', percent: 10, resetsAt: Date.parse(WEEK_RESET), isWeekly: true, observedAt: NOW })
   expect(parseUsage(envelope(group('Claude and GPT models', bucket('5h', 0.1, FIVE_RESET))), NOW)).toBeUndefined()
   expect(parseUsage(envelope(group('Gemini Models', bucket('5h', 1, 'bad'))), NOW)).toEqual({ kind: 'percent', percent: 0, observedAt: NOW })
 })
@@ -120,7 +120,7 @@ test('parseUsage: limits are told apart by window, not by name', () => {
 
 test('parseUsage: a disabled limit is unmetered, so it is not drawn as unused', () => {
   const five = bucket('5h', 1, FIVE_RESET, { disabled: true })
-  expect(parseUsage(envelope(group('Gemini Models', bucket('weekly', 0.9, WEEK_RESET), five)), NOW)).toEqual({ kind: 'percent', percent: 10, resetsAt: Date.parse(WEEK_RESET), observedAt: NOW })
+  expect(parseUsage(envelope(group('Gemini Models', bucket('weekly', 0.9, WEEK_RESET), five)), NOW)).toEqual({ kind: 'percent', percent: 10, resetsAt: Date.parse(WEEK_RESET), isWeekly: true, observedAt: NOW })
   expect(parseUsage(envelope(group('Gemini Models', five)), NOW)).toBeUndefined()
   const argon = group('Gemini 4 Argon', bucket('weekly', 1, WEEK_RESET, { disabled: true }))
   expect(parseUsage(envelope(GEMINI, argon), NOW)).not.toHaveProperty('extra')

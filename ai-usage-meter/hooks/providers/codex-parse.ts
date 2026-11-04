@@ -10,14 +10,14 @@ const toLimit = (w: Window): PercentLimit => ({
   ...(typeof w.resetsAtSec === 'number' ? { resetsAt: w.resetsAtSec * 1000 } : {}),
 })
 
-// 5시간 창 우선, 없으면 7일 창. 둘 다 있으면 7일 창은 secondary로 함께 담는다.
+// 5시간 창 우선, 없으면 7일 창이고 isWeekly로 밝힌다. 둘 다 있으면 7일 창은 secondary로 함께 담는다.
 // 창 이름(primary/secondary)이 아니라 길이로 구분한다.
 export function fromWindows(windows: Window[], observedAt: number): Reading | undefined {
   const five = windows.find(x => x.minutes === FIVE_HOURS)
   const week = windows.find(x => x.minutes === SEVEN_DAYS)
   const w = five ?? week
   if (!w) return undefined
-  return { kind: 'percent', ...toLimit(w), ...(five && week ? { secondary: toLimit(week) } : {}), observedAt }
+  return { kind: 'percent', ...toLimit(w), ...(five && week ? { secondary: toLimit(week) } : {}), ...(five ? {} : { isWeekly: true }), observedAt }
 }
 
 const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x)

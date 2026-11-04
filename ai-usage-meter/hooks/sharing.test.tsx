@@ -43,7 +43,7 @@ function world(on: any, stored: Record<string, unknown> = {}) {
   on('process.run', (_: unknown, e: any) => {
     if (e.argv[0] === 'node') {
       calls.node++
-      calls.attemptWhileRunning = (store['attempts-v4'] as any)?.codex
+      calls.attemptWhileRunning = (store['attempts-v5'] as any)?.codex
       if (mode.codex === 'ok') return { value: { exitCode: 0, stdout: mode.live, stderr: '' } }
       return { value: { exitCode: mode.codexExit, stdout: '', stderr: mode.codexStderr } }
     }
@@ -114,9 +114,9 @@ test("another session's attempt and reading are taken up at the next tick", asyn
   // 다른 세션이 14분 뒤에 agy를 돌렸다.
   await clock.advance(14 * MIN)
   const at = NOW + 14 * MIN
-  store['attempts-v4'] = { ...(store['attempts-v4'] as object), gemini: { at, isOk: true } }
-  store['readings-v4'] = {
-    ...(store['readings-v4'] as object),
+  store['attempts-v5'] = { ...(store['attempts-v5'] as object), gemini: { at, isOk: true } }
+  store['readings-v5'] = {
+    ...(store['readings-v5'] as object),
     gemini: { kind: 'percent', percent: 40, resetsAt: at + 3_600_000, observedAt: at },
   }
 
@@ -130,13 +130,13 @@ test('a store write never brings back an older value from this session', async (
   await start($, clock)
 
   const later = NOW + 10 * 60 * MIN
-  store['readings-v4'] = {
-    ...(store['readings-v4'] as object),
+  store['readings-v5'] = {
+    ...(store['readings-v5'] as object),
     gemini: { kind: 'percent', percent: 40, resetsAt: later + 3_600_000, observedAt: later },
   }
   await clock.advance(3 * MIN + 30_000) // Codex만 다시 조회하고 저장소에 쓴다
 
-  expect((store['readings-v4'] as any).gemini.percent).toBe(40)
+  expect((store['readings-v5'] as any).gemini.percent).toBe(40)
 })
 
 test('a failure keeps the last value through its lifetime, then a dash', async ($, on) => {
@@ -154,8 +154,8 @@ test('a failure keeps the last value through its lifetime, then a dash', async (
 
 test('a stored value past its lifetime is not shown on a new start', async ($, on) => {
   const { clock } = world(on, {
-    'attempts-v4': { codex: { at: NOW, isOk: true }, gemini: { at: NOW, isOk: true } },
-    'readings-v4': {
+    'attempts-v5': { codex: { at: NOW, isOk: true }, gemini: { at: NOW, isOk: true } },
+    'readings-v5': {
       codex: { kind: 'percent', percent: 9, observedAt: NOW - 7 * MIN },
       gemini: { kind: 'percent', percent: 9, observedAt: NOW - 29 * MIN },
     },
@@ -165,7 +165,7 @@ test('a stored value past its lifetime is not shown on a new start', async ($, o
 })
 
 test('an attempt stored as a bare number by an older version still counts', async ($, on) => {
-  const { clock, calls } = world(on, { 'attempts-v4': { codex: NOW - MIN, gemini: NOW - MIN } })
+  const { clock, calls } = world(on, { 'attempts-v5': { codex: NOW - MIN, gemini: NOW - MIN } })
   await start($, clock)
   expect(calls.node).toBe(0)
   expect(calls.agy).toBe(0)
@@ -199,7 +199,7 @@ test('values an older version keeps writing are not read back', async ($, on) =>
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   await clock.settle()
   expect(calls.node).toBe(1) // 이전 버전의 조회 기록에 막히지 않는다
-  expect((store['readings-v4'] as any).codex.percent).toBe(31)
+  expect((store['readings-v5'] as any).codex.percent).toBe(31)
   expect(store.readings).toEqual(old.readings) // 이전 버전의 값도 건드리지 않는다
   expect(store['readings-v3']).toEqual(old['readings-v3'])
 })
@@ -217,7 +217,7 @@ test('a failure leaves its reason in the store, and the band says it failed', as
   mode.codexStderr = 'timeout\n'
   mode.agy = 'fail'
   await start($, clock)
-  const attempts = store['attempts-v4'] as any
+  const attempts = store['attempts-v5'] as any
   expect(attempts.codex.isOk).toBe(false)
   expect(attempts.codex.isMissing).toBeUndefined()
   expect(attempts.codex.error).toContain('helper exit 1: timeout')
@@ -231,7 +231,7 @@ test('a program that is not there reads as not installed', async ($, on) => {
   mode.codex = 'fail'
   mode.codexExit = 2
   await start($, clock)
-  expect((store['attempts-v4'] as any).codex.isMissing).toBe(true)
+  expect((store['attempts-v5'] as any).codex.isMissing).toBe(true)
   expect(await wide($)).toContain('Codex — not installed')
 })
 
@@ -240,15 +240,15 @@ test('a very long reason is cut before it is stored', async ($, on) => {
   mode.codex = 'fail'
   mode.codexStderr = 'x'.repeat(1000)
   await start($, clock)
-  expect((store['attempts-v4'] as any).codex.error.length).toBe(200)
+  expect((store['attempts-v5'] as any).codex.error.length).toBe(200)
 })
 
 test("another session's failure and its reason survive the store", async ($, on) => {
   const failed = { at: NOW, isOk: false, error: 'spawn agy ENOENT', isMissing: true }
-  const { clock, store } = world(on, { 'attempts-v4': { gemini: failed } })
+  const { clock, store } = world(on, { 'attempts-v5': { gemini: failed } })
   await start($, clock)
   expect(await wide($)).toContain('Gemini(AG) — not installed')
-  expect((store['attempts-v4'] as any).gemini).toEqual(failed)
+  expect((store['attempts-v5'] as any).gemini).toEqual(failed)
 })
 
 test('a retry keeps the failure until its result, and success clears the reason', async ($, on) => {
@@ -261,7 +261,7 @@ test('a retry keeps the failure until its result, and success clears the reason'
   await clock.advance(3 * MIN)
   expect(calls.attemptWhileRunning.isOk).toBe(false)
   expect(calls.attemptWhileRunning.at).toBe(NOW + 3 * MIN)
-  expect((store['attempts-v4'] as any).codex).toEqual({ at: NOW + 3 * MIN, isOk: true })
+  expect((store['attempts-v5'] as any).codex).toEqual({ at: NOW + 3 * MIN, isOk: true })
   expect(await wide($)).toContain('Codex ')
   expect(await wide($)).not.toContain('failed')
 })

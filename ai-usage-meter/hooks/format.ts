@@ -174,10 +174,11 @@ function cellsOf(e: Entry, now: number, step: Step, isStacked: boolean, text: St
     const count = shortCount(r.count)
     return [{ label, value: step.isShort ? count : `${count} ${r.unit}` }]
   }
-  const primary = { label, ...limitCell(r, now, step, text) }
+  const weeklyName = step.isShort ? text.weeklyShort : text.weekly
+  const primary = { label: r.isWeekly ? `${label} ${weeklyName}` : label, ...limitCell(r, now, step, text) }
   // 따로 잡히는 한도는 막대 없이 그린다. 줄이 길어 분 단위가 먼저 사라지는 일을 막고, 위험은 빨간색으로 보인다.
   const others: { name: string; limit: PercentLimit; step: Step }[] = [
-    ...(r.secondary ? [{ name: step.isShort ? text.weeklyShort : text.weekly, limit: r.secondary, step }] : []),
+    ...(r.secondary ? [{ name: weeklyName, limit: r.secondary, step }] : []),
     ...(r.extra ? [{ name: step.isShort ? r.extra.short : r.extra.label, limit: r.extra, step: { ...step, hasBar: false } }] : []),
   ]
   if (isStacked) return [primary, ...others.map(o => ({ label: o.name, ...limitCell(o.limit, now, o.step, text) }))]

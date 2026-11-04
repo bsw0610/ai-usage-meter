@@ -147,7 +147,11 @@ test('windows are told apart by length, not by name; other limit ids are ignored
 
 test('only a 7-day window falls back to it', async ($, on) => {
   const { clock } = world(on, one(F, tokenCount(limits(win(61, 10080, 90000), null))))
-  expect(await shown($, clock)).toBe('Codex 61%')
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await clock.settle()
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop', props: { ...BAND.props, bodyColumns: 31 } })
+  expect((await ui.find({ type: 'Text', text: /Codex/ }))?.text).toBe('Codex Weekly 61% · Gemini(AG) —')
+  await ui.unmount()
 })
 
 test('a window whose reset time has passed is shown as 0%', async ($, on) => {
@@ -187,6 +191,8 @@ test('both windows are carried, and one alone stays the only limit', () => {
   const both = parseRollout(tokenCount(limits(five, week)))
   expect(both).toMatchObject({ percent: 31, secondary: { percent: 44, resetsAt: (SEC + 200000) * 1000 } })
   const alone = parseRollout(tokenCount(limits(week, null)))
-  expect(alone).toMatchObject({ percent: 44 })
+  expect(alone).toMatchObject({ percent: 44, isWeekly: true })
   expect(alone && 'secondary' in alone).toBe(false)
+  expect(both && 'isWeekly' in both).toBe(false)
+  expect(parseRollout(tokenCount(limits(five, null)))).not.toHaveProperty('isWeekly')
 })

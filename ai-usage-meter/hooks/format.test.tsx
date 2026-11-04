@@ -521,3 +521,26 @@ test('a third limit shows without a weekly limit, and without one nothing change
   expect(formatLine([{ label: 'A', reading: alone }], NOW)).toBe('A ━━╸─────── 25% (resets 3h) · Argon 3% (resets 6d)')
   expect(formatLine([{ label: 'A', reading: both(25, 3 * HOUR, 10, 5 * DAY) }], NOW)).not.toContain('Argon')
 })
+
+// 5시간 한도가 없는 플랜. 값이 첫 칸에 오므로 주간 값이라고 밝힌다.
+const weeklyOnly = (p: number, left: number) => ({ ...percent(p, left), isWeekly: true })
+
+test('a weekly limit with no five-hour limit says it is weekly, in every language', () => {
+  const list = [{ label: 'Codex', short: 'Cx', reading: weeklyOnly(54, 45 * HOUR) }, { label: 'Gemini(AG)', short: 'AG', reading: both(25, 3 * HOUR, 10, 5 * DAY) }]
+  expect(formatLine(list, NOW, 85).split('\n')).toEqual([
+    'Codex Weekly ━━━━━╸──── 54% (resets 1d 21h)',
+    'Gemini(AG)   ━━╸─────── 25% (resets 3h)     · Weekly ━───────── 10% (resets 5d)',
+  ])
+  expect(formatLine(list, NOW, 85, Infinity, 'ja').split('\n')[0]).toContain('Codex 週間 ')
+  expect(formatLine(list, NOW, 85, Infinity, 'ko').split('\n')[0]).toContain('Codex 주간 ')
+  expect(formatLine(list, NOW, 10).split('\n')[0]).toBe('Cx Wk 54%')
+})
+
+test('a weekly limit alone keeps saying so on one line, and with a third limit beside it', () => {
+  const line = (reading: any) => formatLine([{ label: 'A', reading }, { label: 'B', reading: null }], NOW, Infinity, 1)
+  expect(line(weeklyOnly(54, 45 * HOUR))).toContain('A Weekly ')
+  expect(line(percent(54, 3 * HOUR))).not.toContain('Weekly')
+  const withThird = { ...weeklyOnly(54, 45 * HOUR), extra: argon(3, 6 * DAY) }
+  expect(formatLine([{ label: 'A', reading: withThird }], NOW)).toBe('A Weekly ━━━━━╸──── 54% (resets 1d 21h) · Argon 3% (resets 6d)')
+  expect(line({ ...withThird, extra: argon(95, 6 * DAY) })).toContain('A Argon ')
+})

@@ -48,7 +48,7 @@ function bucketsOf(group: unknown): Bucket[] {
 }
 
 // `agy -p=/usage --output-format json`의 출력. 텍스트 출력은 값이 반올림되고 disabled가 빠진다.
-// Gemini 그룹의 5시간 한도를 우선하고, 없으면 주간 한도. 둘 다 있으면 주간 한도는 secondary로 함께 담는다.
+// Gemini 그룹의 5시간 한도를 우선하고, 없으면 주간 한도이고 isWeekly로 밝힌다. 둘 다 있으면 주간 한도는 secondary로 함께 담는다.
 // Argon의 주간 한도는 따로 잡혀 extra로 담는다.
 export function parseUsage(stdout: string, observedAt: number): Reading | undefined {
   const buckets = (usageGroups(stdout) ?? []).flatMap(bucketsOf)
@@ -62,6 +62,7 @@ export function parseUsage(stdout: string, observedAt: number): Reading | undefi
     kind: 'percent',
     ...main,
     ...(five && week ? { secondary: week } : {}),
+    ...(five ? {} : { isWeekly: true }),
     ...(argon ? { extra: { label: 'Argon', short: 'Ar', ...argon } } : {}),
     observedAt,
   }
