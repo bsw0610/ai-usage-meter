@@ -6,9 +6,8 @@ type Trouble = 'failed' | 'missing' | 'stale'
 
 type Entry = { label: string; short?: string; reading: Reading | null | undefined; trouble?: Trouble }
 
-// 줄의 한 조각. 기본은 흐리게 그린다. isStrong은 사용률처럼 먼저 읽혀야 하는 값이고,
-// color와 함께면 위험 표시라 굵게 그린다.
-export type Part = { text: string; color?: 'error'; isStrong?: boolean }
+// 줄의 한 조각. 기본은 흐리게 그린다. isStrong은 사용률처럼 먼저 읽혀야 하는 값이다.
+export type Part = { text: string; color?: 'warning' | 'error'; isStrong?: boolean }
 
 export type Bar = { percent: number }
 
@@ -29,8 +28,8 @@ const STEPS: Step[] = [
 ]
 
 const DASH = '—'
-const RED_FROM_PERCENT = 90
-const DANGER_MARK = '!' // 색을 구별하기 어려워도 위험을 알 수 있게 한다
+const ORANGE_FROM_PERCENT = 80
+const RED_FROM_PERCENT = 100 // 다 썼을 때
 const RESET_MARK = '↻'
 const SEPARATOR = '│'
 const FIVE_HOUR_NAME = '5h'
@@ -125,7 +124,7 @@ export const BAR_WIDTH_PX = 80
 export const BAR_HEIGHT_PX = 12
 
 // Svg는 이미지로 그려져 테마 색을 받지 못하므로, 밝은 화면과 어두운 화면 모두에서 보이는 중간 색을 쓴다.
-const BAR_COLORS = { error: '#dc2626' }
+const BAR_COLORS = { warning: '#d97706', error: '#dc2626' }
 const BAR_FILL = '#2c84db' // Claude 앱의 파란 강조색(--accent-100). 밝은 화면과 어두운 화면에서 값이 같다.
 const BAR_TRACK = 'rgba(140,140,140,0.3)'
 const BAR_INSET_PX = 2
@@ -163,7 +162,7 @@ function limitCell(r: PercentLimit, now: number, step: Step, text: Strings): Omi
   if (left !== undefined && left <= 0) return { ...(step.hasBar ? { bar: { percent: 0 } } : {}), value: slot('0%') }
 
   const shown = Math.round(r.percent)
-  const isDanger = shown >= RED_FROM_PERCENT
+  const color = shown >= RED_FROM_PERCENT ? ('error' as const) : shown >= ORANGE_FROM_PERCENT ? ('warning' as const) : undefined
   const time =
     left === undefined ? undefined
     : step.detail === 'exact' ? until(left, text)
@@ -171,10 +170,9 @@ function limitCell(r: PercentLimit, now: number, step: Step, text: Strings): Omi
     : undefined
   return {
     ...(step.hasBar ? { bar: { percent: r.percent } } : {}),
-    // 슬롯은 %까지만 맞추고 표시는 그 뒤에 붙인다. 표시가 있는 동안에만 열이 넓어진다.
-    value: `${slot(`${shown}%`)}${isDanger ? DANGER_MARK : ''}`,
+    value: slot(`${shown}%`),
     ...(time ? { reset: `${RESET_MARK} ${time}` } : {}),
-    ...(isDanger ? { color: 'error' as const } : {}),
+    ...(color ? { color } : {}),
   }
 }
 
@@ -196,7 +194,7 @@ function cellsOf(e: Entry, now: number, step: Step, isStacked: boolean, text: St
   // 가장 좁을 때는 첫 칸이 5시간 한도라는 것을 이름 없이 둔다.
   const firstName = r.isWeekly ? text.weeklyShort : step.isShort ? '' : FIVE_HOUR_NAME
   const primary = { source, label: firstName, ...limitCell(r, now, step, text) }
-  // 따로 잡히는 한도는 막대와 슬롯 없이 그린다. 줄이 길어 분 단위가 먼저 사라지는 일을 막고, 위험은 빨간색과 표시로 보인다.
+  // 따로 잡히는 한도는 막대와 슬롯 없이 그린다. 줄이 길어 분 단위가 먼저 사라지는 일을 막고, 위험은 색으로 보인다.
   const others: { name: string; limit: PercentLimit; step: Step }[] = [
     ...(r.secondary ? [{ name: text.weeklyShort, limit: r.secondary, step }] : []),
     ...(r.extra ? [{ name: r.extra.short, limit: r.extra, step: { ...step, hasBar: false, hasNoSlot: true } }] : []),

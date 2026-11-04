@@ -46,20 +46,19 @@ export const register: Register = (on, options) => {
     const widths = columnWidths(rows)
     const { Box, Text } = $.ui.resolve(e)
     const textOf = (text: string) => <Text dimColor wrap="truncate-end">{text}</Text>
-    // 값은 고정폭으로 그려 위아래 열이 맞게 한다. 앞의 빈칸이 합쳐지지 않게 줄바꿈 없는 공백으로 바꾼다.
-    const monoOf = (text: string, color: 'error' | undefined, isStrong: boolean) => {
-      const shown = text.replaceAll(' ', '\u00a0')
-      if (color) return <Text mono color={color} wrap="truncate-end" {...(isStrong ? { weight: 'bold' as const } : {})}>{shown}</Text>
-      return isStrong ? <Text mono wrap="truncate-end">{shown}</Text> : <Text mono dimColor wrap="truncate-end">{shown}</Text>
+    // 값은 앱 글꼴로 그리되 숫자 폭을 통일해, 값이 바뀌어도 흔들리지 않게 한다.
+    const valueOf = (text: string, color: Cell['color'], isStrong: boolean) => {
+      if (color) return <Text tabular color={color} wrap="truncate-end" {...(isStrong && color === 'error' ? { weight: 'bold' as const } : {})}>{text}</Text>
+      return isStrong ? <Text tabular wrap="truncate-end">{text}</Text> : <Text tabular dimColor wrap="truncate-end">{text}</Text>
     }
 
     const rowOf = (cells: Cell[]) => {
       if (e.surface === 'terminal' || !cells.some(c => c.bar)) {
         // 바깥 Text를 흐리게 하면 안쪽 색까지 흐려지므로, 흐림은 조각마다 건다.
         return (
-          <Text mono wrap="truncate-end">
+          <Text wrap="truncate-end">
             {partsOf(cells, widths).map(p =>
-              p.color ? <Text color={p.color} {...(p.isStrong ? { weight: 'bold' as const } : {})}>{p.text}</Text>
+              p.color ? <Text color={p.color} {...(p.isStrong && p.color === 'error' ? { weight: 'bold' as const } : {})}>{p.text}</Text>
               : p.isStrong ? <Text>{p.text}</Text>
               : <Text dimColor>{p.text}</Text>,
             )}
@@ -71,6 +70,11 @@ export const register: Register = (on, options) => {
       // 칸 수는 고정폭 글꼴 기준이고 이름은 비례폭이라, 폭을 고정하면 넓은 글자가 많은 값이 잘린다.
       const sized = (node: RenderChildren, width: number | undefined) =>
         rows.length > 1 && width ? <Box minWidth={width}>{node}</Box> : node
+      // 앱 글꼴에서는 빈칸으로 자리를 맞출 수 없어, 사용률은 칸 안에서 오른쪽으로 민다.
+      const percentOf = (c: Cell, width: number | undefined) => {
+        const node = valueOf(c.value.trim(), c.color, true)
+        return rows.length > 1 && width ? <Box minWidth={width} justifyContent="flex-end">{node}</Box> : node
+      }
       return (
         <Box flexDirection="row" alignItems="center" columnGap={1}>
           {cells.flatMap((c, j) => {
@@ -80,13 +84,13 @@ export const register: Register = (on, options) => {
               ...(c.source !== undefined ? [sized(textOf(c.source), widths.source[j])] : []),
               ...(widths.label[j] ? [sized(textOf(c.label), widths.label[j])] : []),
               ...(c.bar ? [<Svg source={barSvg(c.bar, c.color)} alt={barAlt(c.bar, lang)} width={BAR_WIDTH_PX} height={BAR_HEIGHT_PX} />] : []),
-              sized(monoOf(c.value, c.color, true), isLast && !c.reset ? undefined : widths.value[j]),
+              percentOf(c, isLast && !c.reset ? undefined : widths.value[j]),
               ...(c.reset
                 ? [
                     sized(
                       <Box flexDirection="row" alignItems="center" columnGap={1}>
                         <Svg source={resetIconSvg(c.color)} alt={resetAlt(lang)} width={RESET_ICON_PX} height={RESET_ICON_PX} />
-                        {monoOf(resetTime(c.reset), c.color, false)}
+                        {valueOf(resetTime(c.reset), c.color, false)}
                       </Box>,
                       isLast ? undefined : widths.reset[j],
                     ),

@@ -105,17 +105,19 @@ const colorOf = (reading: any) => partsOf(formatRows([{ label: 'A', reading }], 
 
 test('the bar keeps ten cells', () => {
   expect(one(percent(10, 4 * HOUR))).toBe('A 5h ━─────────  10% ↻ 4h')
-  expect(one(percent(100, 30 * 60_000))).toBe('A 5h ━━━━━━━━━━ 100%! ↻ 30m')
-  expect(one(percent(100, HOUR))).toBe('A 5h ━━━━━━━━━━ 100%! ↻ 1h')
-  expect(one(percent(99, HOUR))).toBe('A 5h ━━━━━━━━━╸  99%! ↻ 1h')
+  expect(one(percent(100, 30 * 60_000))).toBe('A 5h ━━━━━━━━━━ 100% ↻ 30m')
+  expect(one(percent(100, HOUR))).toBe('A 5h ━━━━━━━━━━ 100% ↻ 1h')
+  expect(one(percent(99, HOUR))).toBe('A 5h ━━━━━━━━━╸  99% ↻ 1h')
   expect(one(percent(0, HOUR))).toBe('A 5h ──────────   0% ↻ 1h')
 })
 
-test('the color turns red from 90%, not before', () => {
-  expect(colorOf(percent(89, HOUR))).toBeUndefined()
-  expect(colorOf(percent(90, HOUR))).toBe('error')
-  expect(colorOf(percent(99, HOUR))).toBe('error')
+test('the color turns orange from 80% and red only when used up', () => {
+  expect(colorOf(percent(79, HOUR))).toBeUndefined()
+  expect(colorOf(percent(80, HOUR))).toBe('warning')
+  expect(colorOf(percent(99, HOUR))).toBe('warning')
+  expect(colorOf(percent(100, HOUR))).toBe('error')
   expect(colorOf(percent(95, -HOUR))).toBeUndefined() // 리셋이 지난 창은 0%다
+  expect(barSvg({ percent: 85 }, 'warning')).toContain('stroke="#d97706"')
 })
 
 test('the line moves with the value, with no steps', () => {
@@ -141,7 +143,7 @@ test('the bar is only the used line, and says what it shows', () => {
 })
 
 test('a window used up shows the reset in the error color', () => {
-  expect(one(percent(100, 4 * HOUR))).toBe('A 5h ━━━━━━━━━━ 100%! ↻ 4h')
+  expect(one(percent(100, 4 * HOUR))).toBe('A 5h ━━━━━━━━━━ 100% ↻ 4h')
   expect(colorOf(percent(100, HOUR))).toBe('error')
 })
 
@@ -167,10 +169,10 @@ test('only the limit used up is colored, and the line stays whole, on both surfa
     })
     const colored = (await ui.findAll({ type: 'Text' })).filter(t => t.props.color)
     if (surface === 'terminal') {
-      expect(colored.map(t => [t.text, t.props.color])).toEqual([['━━━━━━━━━━ ', 'error'], ['100%!', 'error'], [' ↻ 4h', 'error']])
-      expect((await ui.find({ type: 'Text', text: /Gemini/ }))?.text).toBe('Codex 5h ━━━━━━━━━━ 100%! ↻ 4h │ Gemini(AG) 5h ━─────────  10% ↻ 4h')
+      expect(colored.map(t => [t.text, t.props.color])).toEqual([['━━━━━━━━━━ ', 'error'], ['100%', 'error'], [' ↻ 4h', 'error']])
+      expect((await ui.find({ type: 'Text', text: /Gemini/ }))?.text).toBe('Codex 5h ━━━━━━━━━━ 100% ↻ 4h │ Gemini(AG) 5h ━─────────  10% ↻ 4h')
     } else {
-      expect(colored.map(t => [t.text, t.props.color])).toEqual([['100%!', 'error'], ['4h', 'error']])
+      expect(colored.map(t => [t.text, t.props.color])).toEqual([['100%', 'error'], ['4h', 'error']])
       const [hot, cold] = (await ui.findAll({ type: 'Svg' })).filter((b: any) => b.props.alt !== 'resets')
       expect(hot?.props.source).toContain('#dc2626')
       expect(cold?.props.source).not.toContain('#dc2626')
@@ -212,14 +214,14 @@ test('with room for one row, each source shows its more urgent limit', () => {
   const line = (reading: any) => formatLine([{ label: 'A', reading }, { label: 'B', reading: null }], NOW, Infinity, 1)
   expect(line(both(82, 3.116 * HOUR, 46, 45 * HOUR))).toContain('A 5h ━━━━━━━━──  82%') // 5시간 쪽이 더 많이 썼다
   expect(line(both(10, 4 * HOUR, 95, 4 * DAY))).toContain('A Wk ') // 주간 쪽이 더 많이 썼다
-  expect(line(both(100, 4 * HOUR, 95, 4 * DAY))).toContain('A 5h ━━━━━━━━━━ 100%!') // 다 쓴 쪽이 먼저다
+  expect(line(both(100, 4 * HOUR, 95, 4 * DAY))).toContain('A 5h ━━━━━━━━━━ 100%') // 다 쓴 쪽이 먼저다
   expect(line(both(10, 4 * HOUR, 100, 4 * DAY))).toContain('A Wk ') // 주간을 다 쓰면 5시간 여유는 소용없다
   expect(line(both(10, 4 * HOUR, 95, -HOUR))).not.toContain('Wk') // 리셋이 지난 주간 창은 0%다
 })
 
 test('each limit is colored on its own', () => {
   expect(formatRows([{ label: 'A', reading: both(10, 4 * HOUR, 100, 4 * DAY) }], NOW)[0]!.map(c => c.color)).toEqual([undefined, 'error'])
-  expect(formatRows([{ label: 'A', reading: both(82, 3.116 * HOUR, 46, 45 * HOUR) }], NOW)[0]!.map(c => c.color)).toEqual([undefined, undefined])
+  expect(formatRows([{ label: 'A', reading: both(82, 3.116 * HOUR, 46, 45 * HOUR) }], NOW)[0]!.map(c => c.color)).toEqual(['warning', undefined])
 })
 
 test('a dash says why at the widths that have room', () => {
@@ -429,7 +431,7 @@ async function band($: any, on: any, cases: [number, string][]) {
         // 막대가 있는 단계는 Svg로 그린다.
         const bars = (await ui.findAll({ type: 'Svg' })).filter((b: any) => b.props.alt !== 'resets')
         expect(bars.map((b: any) => b.props.alt)).toEqual(['18% used', '25% used'])
-        expect((await ui.findAll({ type: 'Text' })).map((t: any) => t.text).join(' ').replaceAll('\u00a0', ' ')).toBe(want.replaceAll('↻ ', '').replace(/ [━╸─]+/g, ''))
+        expect((await ui.findAll({ type: 'Text' })).map((t: any) => t.text).join(' ')).toBe(want.replaceAll('↻ ', '').replace(/ [━╸─]+/g, '').replace(/ +/g, ' '))
       } else {
         expect((await ui.find({ type: 'Text', text: /Cx|Codex/ }))?.text).toBe(want)
         expect(await ui.findAll({ type: 'Svg' })).toHaveLength(0)
@@ -498,7 +500,7 @@ test('with too little room for the minutes, the rows fall back to whole hours', 
 
 test('a third limit is colored on its own', () => {
   const reading = { ...both(10, 4 * HOUR, 20, 4 * DAY), extra: argon(95, 4 * DAY) }
-  expect(formatRows([{ label: 'A', reading }], NOW)[0]!.map(c => c.color)).toEqual([undefined, undefined, 'error'])
+  expect(formatRows([{ label: 'A', reading }], NOW)[0]!.map(c => c.color)).toEqual([undefined, undefined, 'warning'])
 })
 
 test('with room for one row, a third limit shows when it is the most urgent', () => {
@@ -538,10 +540,12 @@ test('a weekly limit alone keeps saying so on one line, and with a third limit b
   expect(line({ ...withThird, extra: argon(95, 6 * DAY) })).toContain('A Argon ')
 })
 
-test('red follows the percent the band shows', () => {
+test('the color follows the percent the band shows', () => {
   const color = (p: number) => formatRows([{ label: 'A', reading: percent(p, HOUR) }], NOW)[0]![0]!.color
-  expect(color(89.4)).toBeUndefined()
-  expect(color(89.6)).toBe('error')
+  expect(color(79.4)).toBeUndefined()
+  expect(color(79.6)).toBe('warning')
+  expect(color(99.4)).toBe('warning')
+  expect(color(99.6)).toBe('error')
 })
 
 test('the reset outlives the long names as the room shrinks', () => {
@@ -592,35 +596,35 @@ test('the shrinking order keeps the percent and the reset longest', () => {
   expect(formatLine(realRows, NOW, 30).split('\n')).toEqual(['Cx 41% │ Wk 53%', 'AG 0%  │ Wk 0%  │ Ar 3%'])
 })
 
-test('from 90% a limit also says so with a mark, so color is not the only signal', () => {
-  const row = (p: number) => formatLine([{ label: 'A', reading: percent(p, 3 * HOUR) }], NOW, 40)
-  expect(row(89)).toBe('A 5h ━━━━━━━━━─  89% ↻ 3h')
-  expect(row(90)).toBe('A 5h ━━━━━━━━━─  90%! ↻ 3h')
-  expect(row(100)).toBe('A 5h ━━━━━━━━━━ 100%! ↻ 3h')
-  expect(row(95)).toContain('95%!')
-  expect(formatLine([{ label: 'A', reading: percent(95, -HOUR) }], NOW, 40)).not.toContain('!') // 리셋이 지난 창은 0%다
+test('orange keeps its normal weight, and only a used-up limit is bold, on both surfaces', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  const value = { codex: both(85, 4 * HOUR, 100, 2 * DAY), gemini: both(10, 4 * HOUR, 20, 2 * DAY) }
+  on('state.get', () => ({ value: { value, version: 0 } }))
+  on('ui.render', () => ({ type: 'engine', ref: 0 }))
+  const props = { hasSurvey: false, isWorking: false, bodyColumns: 85, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} }
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: 'ai-usage-meter', component: 'AbovePrompt', requestId: 'band', surface, props })
+    const texts = await ui.findAll({ type: 'Text' })
+    const of = (needle: string) => texts.find((t: any) => t.props.color && t.text.includes(needle)) as any
+    expect(of('85%').props.color).toBe('warning')
+    expect(of('85%').props.weight).toBeUndefined()
+    expect(of('100%').props.color).toBe('error')
+    expect(of('100%').props.weight).toBe('bold')
+    await ui.unmount()
+  }
 })
 
-test('a mark widens its column only while it is there, so the minutes stay at 85', () => {
-  const calm = formatLine(realRows, NOW, 85)
-  expect(calm).not.toContain('!')
-  const hot = [{ ...realRows[0]!, reading: both(95, 4.75 * HOUR, 53, 21.2 * HOUR) }, realRows[1]!]
-  const rows = formatLine(hot, NOW, 85).split('\n')
-  expect(rows[0]).toBe('Codex      5h ━━━━━━━━━╸  95%! ↻ 4h45m │ Wk ━━━━━╸────  53% ↻ 21h12m')
-  expect(rows[1]).toBe('Gemini(AG) 5h ──────────   0%  ↻ 4h45m │ Wk ──────────   0% ↻ 7d     │ Ar 3% ↻ 6d')
-})
-
-test('percent reads brighter than its surroundings, and bold only when in danger', () => {
+test('percent reads brighter than its surroundings, and takes the color of its limit', () => {
   const calm = partsOf(formatRows([{ label: 'A', reading: percent(41, 3 * HOUR) }], NOW)[0]!)
   expect(calm.find(p => p.text.includes('41%'))).toMatchObject({ isStrong: true })
   expect(calm.find(p => p.text.includes('41%'))?.color).toBeUndefined()
   expect(calm.find(p => p.text.includes('↻'))?.isStrong).toBeUndefined()
-  const hot = partsOf(formatRows([{ label: 'A', reading: percent(95, 3 * HOUR) }], NOW)[0]!)
-  expect(hot.find(p => p.text.includes('95%!'))).toMatchObject({ isStrong: true, color: 'error' })
+  const hot = partsOf(formatRows([{ label: 'A', reading: percent(100, 3 * HOUR) }], NOW)[0]!)
+  expect(hot.find(p => p.text.includes('100%'))).toMatchObject({ isStrong: true, color: 'error' })
   expect(hot.find(p => p.text.includes('↻'))).toMatchObject({ color: 'error' })
 })
 
-test('on the desktop the values are monospaced and the groups stay separate', async ($, on) => {
+test('on the desktop the values keep the app font with digits of one width, and the groups stay separate', async ($, on) => {
   mock.clock(on, { now: NOW })
   const value = { codex: both(41, 4.75 * HOUR, 53, 21.2 * HOUR), gemini: { ...both(0, 4.75 * HOUR, 0, 7 * DAY), extra: argon(3, 6 * DAY) } }
   on('state.get', () => ({ value: { value, version: 0 } }))
@@ -629,10 +633,12 @@ test('on the desktop the values are monospaced and the groups stay separate', as
   const ui = await $.ui.mount({ plugin: 'ai-usage-meter', component: 'AbovePrompt', requestId: 'band', surface: 'desktop', props })
   const texts = await ui.findAll({ type: 'Text' })
   const of = (t: string) => texts.find((x: any) => x.text === t) as any
-  expect(of(' 41%').props.mono).toBe(true)
-  expect(of('4h45m').props.mono).toBe(true)
+  expect(of('41%').props.mono).toBeUndefined()
+  expect(of('41%').props.tabular).toBe(true)
+  expect(of('4h45m').props.mono).toBeUndefined()
+  expect(of('4h45m').props.tabular).toBe(true)
   expect(of('4h45m').props.dimColor).toBe(true)
-  expect(of(' 41%').props.dimColor).toBeUndefined()
+  expect(of('41%').props.dimColor).toBeUndefined()
   expect(of('Codex').props.mono).toBeUndefined()
   expect(texts.filter((x: any) => x.text === '│')).toHaveLength(3)
   expect((await ui.findAll({ type: 'Svg' })).filter((b: any) => b.props.alt !== 'resets')).toHaveLength(4)
@@ -652,7 +658,7 @@ test('the longest day format keeps the minutes at 85 in English and at 88 in the
 
 test('on the desktop the reset mark is a drawn icon, so its size does not depend on the font', async ($, on) => {
   mock.clock(on, { now: NOW })
-  const value = { codex: both(95, 4.75 * HOUR, 53, 21.2 * HOUR), gemini: both(0, 4.75 * HOUR, 0, 7 * DAY) }
+  const value = { codex: both(100, 4.75 * HOUR, 53, 21.2 * HOUR), gemini: both(85, 4.75 * HOUR, 0, 7 * DAY) }
   on('state.get', () => ({ value: { value, version: 0 } }))
   on('ui.render', () => ({ type: 'engine', ref: 0 }))
   const props = { hasSurvey: false, isWorking: false, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} }
@@ -663,7 +669,8 @@ test('on the desktop the reset mark is a drawn icon, so its size does not depend
   const icons = (await wide.findAll({ type: 'Svg' })).filter((b: any) => b.props.alt === 'resets')
   expect(icons).toHaveLength(4)
   expect(icons.every((b: any) => b.props.width === RESET_ICON_PX && b.props.height === RESET_ICON_PX)).toBe(true)
-  expect(icons.map((b: any) => b.props.source.includes('#dc2626'))).toEqual([true, false, false, false]) // 위험한 한도만 빨갛다
+  expect(icons.map((b: any) => b.props.source.includes('#dc2626'))).toEqual([true, false, false, false]) // 다 쓴 한도만 빨갛다
+  expect(icons.map((b: any) => b.props.source.includes('#d97706'))).toEqual([false, false, true, false]) // 80% 이상은 주황이다
   expect((await wide.findAll({ type: 'Text' })).some((t: any) => t.text.includes('↻'))).toBe(false)
   await wide.unmount()
 
