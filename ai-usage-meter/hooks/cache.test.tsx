@@ -13,7 +13,7 @@ const BAND = {
 } as const
 
 const LIVE = JSON.stringify({ limitId: 'codex', windows: [{ usedPercent: 31, windowDurationMins: 300, resetsAt: SEC + 7200 }] })
-const AGY = ['Gemini Models', 'Five Hour Limit Remaining', '75%', '2026-11-04T13:00:00Z'].join('\t') + '\n'
+const AGY = JSON.stringify({ status: 'SUCCESS', command: { name: 'usage', data: { groups: [{ name: 'Gemini Models', buckets: [{ window: '5h', remaining_fraction: 0.75, reset_time: '2026-11-04T13:00:00Z' }] }] } } }) + '\n'
 
 type Mode = { codex: 'ok' | 'fail'; agy: 'ok' | 'fail' }
 

@@ -3,14 +3,15 @@ import { expect, mock, test } from 'claude-code/testing'
 import { gemini } from './providers/gemini'
 import { parseUsage } from './providers/gemini-parse'
 
-// 픽스처는 직접 만든 가짜 값이다. 탭 구분.
+// 픽스처는 직접 만든 가짜 값이다. 모양은 agy 1.4.12의 `--output-format json` 출력을 따른다.
 const NOW = Date.parse('2026-11-04T10:00:00Z')
-const row = (...c: string[]) => c.join('\t')
-const SAMPLE = [
-  row('Gemini Models', 'Weekly Limit Remaining', '90%', '2026-11-10T00:00:00Z'),
-  row('Gemini Models', 'Five Hour Limit Remaining', '75%', '2026-11-04T13:00:00Z'),
-  row('Claude and GPT models', 'Five Hour Limit Remaining', '10%', '2026-11-04T13:00:00Z'),
-].join('\n')
+const WEEK_RESET = '2026-11-10T00:00:00Z'
+const FIVE_RESET = '2026-11-04T13:00:00Z'
+const bucket = (window: string, remaining_fraction: unknown, reset_time: unknown, more = {}) => ({ id: window, window, remaining_fraction, reset_time, ...more })
+const group = (name: string, ...buckets: object[]) => ({ name, buckets })
+const envelope = (...groups: object[]) => JSON.stringify({ status: 'SUCCESS', command: { name: 'usage', data: { groups } } })
+const GEMINI = group('Gemini Models', bucket('weekly', 0.9, WEEK_RESET), bucket('5h', 0.75, FIVE_RESET))
+const SAMPLE = envelope(GEMINI, group('Claude and GPT models', bucket('5h', 0.1, FIVE_RESET)))
 
 const BAND = {
   plugin: 'ai-usage-meter',
@@ -58,7 +59,7 @@ async function shown($: any, clock: { settle: () => Promise<void> }, surface: 't
 test('the Gemini five-hour window is shown as used percent, on both surfaces', async ($, on) => {
   const { clock, calls } = world(on, 'ok')
   expect(await shown($, clock, 'terminal')).toBe('Gemini(AG) 25%')
-  expect(calls.find(a => a[0] === 'agy')).toEqual(['agy', '--print-timeout', '12s', '-p=/usage'])
+  expect(calls.find(a => a[0] === 'agy')).toEqual(['agy', '--print-timeout', '12s', '--output-format', 'json', '-p=/usage'])
 })
 
 for (const run of ['exit1', 'throw', 'garbage', 'login'] as const) {
@@ -96,24 +97,45 @@ test('a failing agy does not blank Codex', async ($, on) => {
 })
 
 test('parseUsage: weekly is the fallback, remaining becomes used, other groups are ignored', () => {
-  const weekly = row('Gemini Models', 'Weekly Limit Remaining', '90%', '2026-11-10T00:00:00Z')
-  expect(parseUsage(weekly, NOW)).toEqual({ kind: 'percent', percent: 10, resetsAt: Date.parse('2026-11-10T00:00:00Z'), observedAt: NOW })
-  expect(parseUsage(row('Claude and GPT models', 'Five Hour Limit Remaining', '10%', 'x'), NOW)).toBeUndefined()
-  expect(parseUsage(row('Gemini Models', 'Five Hour Limit Remaining', '100%', 'bad'), NOW)).toEqual({ kind: 'percent', percent: 0, observedAt: NOW })
+  expect(parseUsage(envelope(group('Gemini Models', bucket('weekly', 0.9, WEEK_RESET))), NOW)).toEqual({ kind: 'percent', percent: 10, resetsAt: Date.parse(WEEK_RESET), observedAt: NOW })
+  expect(parseUsage(envelope(group('Claude and GPT models', bucket('5h', 0.1, FIVE_RESET))), NOW)).toBeUndefined()
+  expect(parseUsage(envelope(group('Gemini Models', bucket('5h', 1, 'bad'))), NOW)).toEqual({ kind: 'percent', percent: 0, observedAt: NOW })
 })
 
 test('parseUsage: with both limits, the weekly one comes along as used percent', () => {
-  const text = [
-    row('Gemini Models', 'Weekly Limit Remaining', '90%', '2026-11-10T00:00:00Z'),
-    row('Gemini Models', 'Five Hour Limit Remaining', '75%', '2026-11-04T13:00:00Z'),
-  ].join('\n')
-  expect(parseUsage(text, NOW)).toEqual({
+  expect(parseUsage(envelope(GEMINI), NOW)).toEqual({
     kind: 'percent',
     percent: 25,
-    resetsAt: Date.parse('2026-11-04T13:00:00Z'),
-    secondary: { percent: 10, resetsAt: Date.parse('2026-11-10T00:00:00Z') },
+    resetsAt: Date.parse(FIVE_RESET),
+    secondary: { percent: 10, resetsAt: Date.parse(WEEK_RESET) },
     observedAt: NOW,
   })
+})
+
+test('parseUsage: limits are told apart by window, not by name', () => {
+  const renamed = group('Gemini Models', bucket('weekly', 0.9, WEEK_RESET, { name: 'Five Hour Limit Remaining' }), bucket('5h', 0.75, FIVE_RESET, { name: 'Weekly Limit Remaining' }))
+  expect(parseUsage(envelope(renamed), NOW)).toMatchObject({ percent: 25, secondary: { percent: 10 } })
+  expect(parseUsage(envelope(group('Gemini Models', bucket('monthly', 0.5, WEEK_RESET))), NOW)).toBeUndefined()
+})
+
+test('parseUsage: a disabled limit is unmetered, so it is not drawn as unused', () => {
+  const five = bucket('5h', 1, FIVE_RESET, { disabled: true })
+  expect(parseUsage(envelope(group('Gemini Models', bucket('weekly', 0.9, WEEK_RESET), five)), NOW)).toEqual({ kind: 'percent', percent: 10, resetsAt: Date.parse(WEEK_RESET), observedAt: NOW })
+  expect(parseUsage(envelope(group('Gemini Models', five)), NOW)).toBeUndefined()
+  const argon = group('Gemini 4 Argon', bucket('weekly', 1, WEEK_RESET, { disabled: true }))
+  expect(parseUsage(envelope(GEMINI, argon), NOW)).not.toHaveProperty('extra')
+})
+
+test('parseUsage: only a successful usage reply counts, and log lines around it are skipped', () => {
+  expect((parseUsage(`starting up\n{"log":true}\n{not json\n${SAMPLE}\nbye\n`, NOW) as any).percent).toBe(25)
+  const reply = (status: string, name: string, groups: unknown) => JSON.stringify({ status, command: { name, data: { groups } } })
+  const groups = [GEMINI]
+  expect(parseUsage(reply('ERROR', 'usage', groups), NOW)).toBeUndefined()
+  expect(parseUsage(reply('SUCCESS', 'help', groups), NOW)).toBeUndefined()
+  expect(parseUsage(reply('SUCCESS', 'usage', 'none'), NOW)).toBeUndefined()
+  expect(parseUsage(JSON.stringify({ status: 'SUCCESS', response: 'hello' }), NOW)).toBeUndefined()
+  expect(parseUsage(envelope(group('Gemini Models', bucket('5h', 'lots', FIVE_RESET))), NOW)).toBeUndefined()
+  expect(parseUsage('', NOW)).toBeUndefined()
 })
 
 test('agy runs with its self-updater turned off', async ($, on) => {
@@ -124,21 +146,15 @@ test('agy runs with its self-updater turned off', async ($, on) => {
   expect(envs[i]).toEqual({ AGY_CLI_DISABLE_AUTO_UPDATE: 'true' })
 })
 
-// agy 1.4.12의 출력 모양. 값은 가짜다. Argon 줄만 이름에 "Remaining"이 없지만 값은 똑같이 남은 %다.
-const WITH_ARGON = [
-  row('Gemini Models', 'Weekly Limit Remaining', '90%', '2026-11-10T00:00:00Z'),
-  row('Gemini Models', 'Five Hour Limit Remaining', '75%', '2026-11-04T13:00:00Z'),
-  row('Claude and GPT models', 'Weekly Limit Remaining', '10%', '2026-11-10T00:00:00Z'),
-  row('Claude and GPT models', 'Five Hour Limit Remaining', '10%', '2026-11-04T13:00:00Z'),
-  row('Gemini 4 Argon', 'Gemini 4 Argon Weekly Limit', '97%', '2026-11-09T12:00:00Z'),
-].join('\n')
+const ARGON = group('Gemini 4 Argon', bucket('weekly', 0.9735, '2026-11-09T12:00:00Z'))
+const WITH_ARGON = envelope(GEMINI, group('Claude and GPT models', bucket('weekly', 0.1, WEEK_RESET), bucket('5h', 0.1, FIVE_RESET)), ARGON)
 
 test('parseUsage: the Argon weekly limit comes along as used percent', () => {
   expect(parseUsage(WITH_ARGON, NOW)).toEqual({
     kind: 'percent',
     percent: 25,
-    resetsAt: Date.parse('2026-11-04T13:00:00Z'),
-    secondary: { percent: 10, resetsAt: Date.parse('2026-11-10T00:00:00Z') },
+    resetsAt: Date.parse(FIVE_RESET),
+    secondary: { percent: 10, resetsAt: Date.parse(WEEK_RESET) },
     extra: { label: 'Argon', short: 'Ar', percent: 3, resetsAt: Date.parse('2026-11-09T12:00:00Z') },
     observedAt: NOW,
   })
@@ -148,7 +164,7 @@ test('parseUsage: the Argon group is found under another model version, and is o
   const next = WITH_ARGON.replaceAll('Gemini 4 Argon', 'Gemini 5 Argon')
   expect((parseUsage(next, NOW) as any).extra.percent).toBe(3)
   expect(parseUsage(SAMPLE, NOW)).not.toHaveProperty('extra')
-  expect(parseUsage(row('Gemini 4 Argon', 'Gemini 4 Argon Weekly Limit', '97%', 'x'), NOW)).toBeUndefined() // Argon만으로는 값이 아니다
+  expect(parseUsage(envelope(ARGON), NOW)).toBeUndefined() // Argon만으로는 값이 아니다
 })
 
 test('one agy run reaches the band with the Argon limit', async ($, on) => {

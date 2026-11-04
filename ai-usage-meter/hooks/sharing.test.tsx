@@ -14,7 +14,7 @@ const BAND = {
 } as const
 
 const LIVE = JSON.stringify({ limitId: 'codex', windows: [{ usedPercent: 31, windowDurationMins: 300, resetsAt: SEC + 86_400 }] })
-const AGY = ['Gemini Models', 'Five Hour Limit Remaining', '75%', '2026-11-05T13:00:00Z'].join('\t') + '\n'
+const AGY = JSON.stringify({ status: 'SUCCESS', command: { name: 'usage', data: { groups: [{ name: 'Gemini Models', buckets: [{ window: '5h', remaining_fraction: 0.75, reset_time: '2026-11-05T13:00:00Z' }] }] } } }) + '\n'
 
 function world(on: any, stored: Record<string, unknown> = {}) {
   const clock = mock.clock(on, { now: NOW })
@@ -88,7 +88,7 @@ test('a failed agy waits thirty minutes, and its print timeout is twelve seconds
   mode.agy = 'fail'
   await start($, clock)
   expect(calls.agy).toBe(1)
-  expect(calls.agyArgv).toEqual(['agy', '--print-timeout', '12s', '-p=/usage'])
+  expect(calls.agyArgv).toEqual(['agy', '--print-timeout', '12s', '--output-format', 'json', '-p=/usage'])
 
   await clock.advance(29 * MIN + 30_000)
   expect(calls.agy).toBe(1)

@@ -404,7 +404,7 @@ test('a language not on the list falls back to English', { options: { language: 
 })
 
 const LIVE = JSON.stringify({ limitId: 'codex', windows: [{ usedPercent: 18, windowDurationMins: 300, resetsAt: SEC + 7200 }] })
-const AGY = ['Gemini Models', 'Five Hour Limit Remaining', '75%', new Date(NOW + 3 * HOUR).toISOString()].join('\t') + '\n'
+const AGY = JSON.stringify({ status: 'SUCCESS', command: { name: 'usage', data: { groups: [{ name: 'Gemini Models', buckets: [{ window: '5h', remaining_fraction: 0.75, reset_time: new Date(NOW + 3 * HOUR).toISOString() }] }] } } }) + '\n'
 
 async function band($: any, on: any, cases: [number, string][]) {
   const clock = mock.clock(on, { now: NOW })
