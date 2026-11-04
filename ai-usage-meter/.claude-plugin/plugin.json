@@ -1,6 +1,6 @@
 {
   "name": "ai-usage-meter",
-  "version": "0.11.2",
+  "version": "0.12.0",
   "description": "Shows Codex and Gemini (Antigravity) usage in a band above the prompt.",
   "license": "MIT",
   "types": "./types/index.d.ts",
@@ -11,6 +11,13 @@
       "description": "Language of the band: en (English), ja (日本語), ko (한국어)",
       "options": ["en", "ja", "ko"],
       "default": "en"
+    },
+    "sources": {
+      "type": "string",
+      "title": "Sources",
+      "description": "Sources to look up and show: all, codex or gemini",
+      "options": ["all", "codex", "gemini"],
+      "default": "all"
     }
   }
 }

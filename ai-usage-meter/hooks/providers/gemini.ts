@@ -29,7 +29,7 @@ export const gemini: Provider = {
     }
     if (r.exitCode !== 0) throw new ReadFailure(`agy exit ${r.exitCode}: ${r.stderr.trim()}`)
     const reading = parseUsage(r.stdout, await io.now())
-    if (!reading) throw new ReadFailure(`agy: 한도 줄 없음: ${r.stdout.trim()}`)
+    if (!reading) throw new ReadFailure(`agy: no limit line: ${r.stdout.trim()}`)
     return reading
   },
 }

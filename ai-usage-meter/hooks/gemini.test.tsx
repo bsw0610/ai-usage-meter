@@ -83,7 +83,7 @@ test('the reason agy failed comes with the failure, and a missing agy says so', 
   expect([exited.message, exited.isMissing]).toEqual(['agy exit 3: no session', false])
 
   const login = await failure(async () => ({ exitCode: 0, stdout: 'Please sign in\n', stderr: '' }))
-  expect([login.message, login.isMissing]).toEqual(['agy: 한도 줄 없음: Please sign in', false])
+  expect([login.message, login.isMissing]).toEqual(['agy: no limit line: Please sign in', false])
 })
 
 test('a failing agy does not blank Codex', async ($, on) => {

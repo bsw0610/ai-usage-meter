@@ -143,7 +143,7 @@ export async function refreshDue($: EngineInterface, list: Provider[]): Promise<
     due.map(async p => {
       try {
         const reading = await p.read(io)
-        if (!reading) throw new ReadFailure('값 없음')
+        if (!reading) throw new ReadFailure('no value')
         // observedAt은 읽어 온 시각이다. 오래된 로그의 값도 지금 읽었으면 수명이 새로 시작한다.
         await put($, p.id, { ...reading, observedAt: now })
         await markAttempts($, { [p.id]: { at: now, isOk: true } })

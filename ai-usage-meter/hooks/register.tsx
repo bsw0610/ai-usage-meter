@@ -3,7 +3,7 @@ import type { Register, RenderChildren } from 'claude-code'
 import type {} from '../types/index'
 import type { Cell } from './format'
 import { BAR_HEIGHT_PX, BAR_WIDTH_PX, DEFAULT_LANG, LOGO_PX, RESET_ICON_PX, barAlt, barSvg, columnWidths, isLang, logoSvg, partsOf, resetAlt, resetIconSvg, resetTime, rowsFor } from './format'
-import { providers } from './providers'
+import { activeProviders } from './providers'
 import { pullFromStore, put, refreshDue } from './readings'
 
 const TICK_MS = 30_000
@@ -13,6 +13,7 @@ const attempts = { plugin: 'ai-usage-meter', key: 'attempts' } as const
 
 export const register: Register = (on, options) => {
   const lang = isLang(options.language) ? options.language : DEFAULT_LANG
+  const providers = activeProviders(options.sources)
 
   on('session.start', async ($, e, next) => {
     await pullFromStore($)

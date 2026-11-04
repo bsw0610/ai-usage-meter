@@ -287,6 +287,7 @@ export const formatLine = (entries: Entry[], now = 0, columns = Infinity, maxRow
 
 // 등록된 목록과 저장된 readings를 합쳐 줄로. 목록이 무엇이든 상관없다.
 // 수명(기본은 조회 간격의 2배)이 지난 값은 없는 값으로 그린다.
+// 설치되지 않은 소스는 줄을 차지하지 않는다. 모두 설치되지 않았으면 밴드가 비지 않도록 그 사실을 그린다.
 export function rowsFor(
   list: { id: string; label: string; short?: string; logo?: string; ttlMs?: number; maxAgeMs?: number }[],
   readings: Record<string, Reading | null>,
@@ -296,21 +297,17 @@ export function rowsFor(
   attempts: Record<string, Attempt> = {},
   lang: Lang = DEFAULT_LANG,
 ): Cell[][] {
-  return formatRows(
-    list.map(p => {
-      const r = readings[p.id]
-      const maxAge = p.maxAgeMs ?? 2 * (p.ttlMs ?? DEFAULT_TTL_MS)
-      const named = { label: p.label, short: p.short, ...(p.logo ? { logo: p.logo } : {}) }
-      if (r && now - r.observedAt <= maxAge) return { ...named, reading: r }
-      const last = attempts[p.id]
-      const trouble = last && !last.isOk ? (last.isMissing ? 'missing' : 'failed') : r ? 'stale' : undefined
-      return { ...named, reading: null, ...(trouble ? { trouble } : {}) }
-    }),
-    now,
-    columns,
-    maxRows,
-    lang,
-  )
+  const entries: Entry[] = list.map(p => {
+    const r = readings[p.id]
+    const maxAge = p.maxAgeMs ?? 2 * (p.ttlMs ?? DEFAULT_TTL_MS)
+    const named = { label: p.label, short: p.short, ...(p.logo ? { logo: p.logo } : {}) }
+    if (r && now - r.observedAt <= maxAge) return { ...named, reading: r }
+    const last = attempts[p.id]
+    const trouble: Trouble | undefined = last && !last.isOk ? (last.isMissing ? 'missing' : 'failed') : r ? 'stale' : undefined
+    return { ...named, reading: null, ...(trouble ? { trouble } : {}) }
+  })
+  const installed = entries.filter(e => e.trouble !== 'missing')
+  return formatRows(installed.length ? installed : entries, now, columns, maxRows, lang)
 }
 
 export const lineFor = (...args: Parameters<typeof rowsFor>) => lineOf(rowsFor(...args))
