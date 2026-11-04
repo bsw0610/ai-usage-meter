@@ -1,7 +1,8 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { RESET_ICON_PX, barAlt, barSvg, displayWidth, formatLine, formatRows, lineFor, partsOf } from './format'
+import { LOGO_PX, RESET_ICON_PX, barAlt, barSvg, displayWidth, formatLine, formatRows, lineFor, logoSvg, partsOf } from './format'
 import { providers } from './providers'
+import { GEMINI_LOGO, OPENAI_LOGO } from './providers/logos'
 
 // 픽스처는 직접 만든 가짜 값이다.
 const NOW = Date.parse('2026-11-04T10:00:00Z')
@@ -142,7 +143,7 @@ test('the bar is only the used line, and says what it shows', () => {
   expect(barAlt({ percent: 51.4 })).toBe('51% used')
 })
 
-test('a window used up shows the reset in the error color', () => {
+test('a window used up shows its percent in the error color', () => {
   expect(one(percent(100, 4 * HOUR))).toBe('A 5h ━━━━━━━━━━ 100% ↻ 4h')
   expect(colorOf(percent(100, HOUR))).toBe('error')
 })
@@ -169,11 +170,11 @@ test('only the limit used up is colored, and the line stays whole, on both surfa
     })
     const colored = (await ui.findAll({ type: 'Text' })).filter(t => t.props.color)
     if (surface === 'terminal') {
-      expect(colored.map(t => [t.text, t.props.color])).toEqual([['━━━━━━━━━━ ', 'error'], ['100%', 'error'], [' ↻ 4h', 'error']])
+      expect(colored.map(t => [t.text, t.props.color])).toEqual([['━━━━━━━━━━ ', 'error'], ['100%', 'error']])
       expect((await ui.find({ type: 'Text', text: /Gemini/ }))?.text).toBe('Codex 5h ━━━━━━━━━━ 100% ↻ 4h │ Gemini(AG) 5h ━─────────  10% ↻ 4h')
     } else {
-      expect(colored.map(t => [t.text, t.props.color])).toEqual([['100%', 'error'], ['4h', 'error']])
-      const [hot, cold] = (await ui.findAll({ type: 'Svg' })).filter((b: any) => b.props.alt !== 'resets')
+      expect(colored.map(t => [t.text, t.props.color])).toEqual([['100%', 'error']])
+      const [hot, cold] = (await ui.findAll({ type: 'Svg' })).filter((b: any) => /%/.test(b.props.alt))
       expect(hot?.props.source).toContain('#dc2626')
       expect(cold?.props.source).not.toContain('#dc2626')
     }
@@ -268,7 +269,7 @@ test('the band draws one row per source, on both surfaces', async ($, on) => {
   await terminal.unmount()
 
   const desktop = await mount('desktop', 5)
-  expect((await desktop.findAll({ type: 'Svg' })).map((b: any) => b.props.alt).filter((alt: string) => alt !== 'resets')).toEqual([
+  expect((await desktop.findAll({ type: 'Svg' })).map((b: any) => b.props.alt).filter((alt: string) => /%/.test(alt))).toEqual([
     '82% used',
     '46% used',
     '25% used',
@@ -277,7 +278,7 @@ test('the band draws one row per source, on both surfaces', async ($, on) => {
   await desktop.unmount()
 
   const oneRow = await mount('desktop', 1)
-  expect((await oneRow.findAll({ type: 'Svg' })).filter((b: any) => b.props.alt !== 'resets')).toHaveLength(2)
+  expect((await oneRow.findAll({ type: 'Svg' })).filter((b: any) => /%/.test(b.props.alt))).toHaveLength(2)
   await oneRow.unmount()
 })
 
@@ -379,7 +380,7 @@ for (const [language, row, alt] of [
     await terminal.unmount()
 
     const desktop = await mount('desktop')
-    expect((await desktop.findAll({ type: 'Svg' }))[0]?.props.alt).toBe(alt)
+    expect((await desktop.findAll({ type: 'Svg' })).find((b: any) => /%/.test(b.props.alt))?.props.alt).toBe(alt)
     await desktop.unmount()
   })
 }
@@ -429,9 +430,9 @@ async function band($: any, on: any, cases: [number, string][]) {
       })
       if (surface === 'desktop' && want.includes('━')) {
         // 막대가 있는 단계는 Svg로 그린다.
-        const bars = (await ui.findAll({ type: 'Svg' })).filter((b: any) => b.props.alt !== 'resets')
+        const bars = (await ui.findAll({ type: 'Svg' })).filter((b: any) => /%/.test(b.props.alt))
         expect(bars.map((b: any) => b.props.alt)).toEqual(['18% used', '25% used'])
-        expect((await ui.findAll({ type: 'Text' })).map((t: any) => t.text).join(' ')).toBe(want.replaceAll('↻ ', '').replace(/ [━╸─]+/g, '').replace(/ +/g, ' '))
+        expect((await ui.findAll({ type: 'Text' })).map((t: any) => t.text).join(' ')).toBe(want.replaceAll('↻ ', '').replace(/(Codex|Gemini\(AG\)) /g, '').replace(/ [━╸─]+/g, '').replace(/ +/g, ' '))
       } else {
         expect((await ui.find({ type: 'Text', text: /Cx|Codex/ }))?.text).toBe(want)
         expect(await ui.findAll({ type: 'Svg' })).toHaveLength(0)
@@ -621,7 +622,7 @@ test('percent reads brighter than its surroundings, and takes the color of its l
   expect(calm.find(p => p.text.includes('↻'))?.isStrong).toBeUndefined()
   const hot = partsOf(formatRows([{ label: 'A', reading: percent(100, 3 * HOUR) }], NOW)[0]!)
   expect(hot.find(p => p.text.includes('100%'))).toMatchObject({ isStrong: true, color: 'error' })
-  expect(hot.find(p => p.text.includes('↻'))).toMatchObject({ color: 'error' })
+  expect(hot.find(p => p.text.includes('↻'))?.color).toBeUndefined() // 리셋은 한도 색을 따르지 않는다
 })
 
 test('on the desktop the values keep the app font with digits of one width, and the groups stay separate', async ($, on) => {
@@ -639,9 +640,9 @@ test('on the desktop the values keep the app font with digits of one width, and 
   expect(of('4h45m').props.tabular).toBe(true)
   expect(of('4h45m').props.dimColor).toBe(true)
   expect(of('41%').props.dimColor).toBeUndefined()
-  expect(of('Codex').props.mono).toBeUndefined()
+  expect(of('5h').props.mono).toBeUndefined()
   expect(texts.filter((x: any) => x.text === '│')).toHaveLength(3)
-  expect((await ui.findAll({ type: 'Svg' })).filter((b: any) => b.props.alt !== 'resets')).toHaveLength(4)
+  expect((await ui.findAll({ type: 'Svg' })).filter((b: any) => /%/.test(b.props.alt))).toHaveLength(4)
   await ui.unmount()
 })
 
@@ -669,8 +670,7 @@ test('on the desktop the reset mark is a drawn icon, so its size does not depend
   const icons = (await wide.findAll({ type: 'Svg' })).filter((b: any) => b.props.alt === 'resets')
   expect(icons).toHaveLength(4)
   expect(icons.every((b: any) => b.props.width === RESET_ICON_PX && b.props.height === RESET_ICON_PX)).toBe(true)
-  expect(icons.map((b: any) => b.props.source.includes('#dc2626'))).toEqual([true, false, false, false]) // 다 쓴 한도만 빨갛다
-  expect(icons.map((b: any) => b.props.source.includes('#d97706'))).toEqual([false, false, true, false]) // 80% 이상은 주황이다
+  expect(icons.some((b: any) => /#dc2626|#d97706/.test(b.props.source))).toBe(false) // 한도 색을 따르지 않는다
   expect((await wide.findAll({ type: 'Text' })).some((t: any) => t.text.includes('↻'))).toBe(false)
   await wide.unmount()
 
@@ -680,4 +680,40 @@ test('on the desktop the reset mark is a drawn icon, so its size does not depend
     expect((await ui.find({ type: 'Text', text: /Codex/ }))?.text).toContain('↻ ')
     await ui.unmount()
   }
+})
+
+test('on the desktop a logo stands in for the source name where bars are drawn; elsewhere the name stays', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  const value = { codex: both(41, 4.75 * HOUR, 53, 21.2 * HOUR), gemini: both(0, 4.75 * HOUR, 0, 7 * DAY) }
+  on('state.get', () => ({ value: { value, version: 0 } }))
+  on('ui.render', () => ({ type: 'engine', ref: 0 }))
+  const props = { hasSurvey: false, isWorking: false, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} }
+  const mount = (surface: 'desktop' | 'terminal', bodyColumns: number) =>
+    $.ui.mount({ plugin: 'ai-usage-meter', component: 'AbovePrompt', requestId: 'band', surface, props: { ...props, bodyColumns } })
+
+  const wide = await mount('desktop', 85)
+  const logos = (await wide.findAll({ type: 'Svg' })).filter((b: any) => ['Codex', 'Gemini(AG)'].includes(b.props.alt))
+  expect(logos.map((b: any) => b.props.alt)).toEqual(['Codex', 'Gemini(AG)'])
+  expect(logos.every((b: any) => b.props.width === LOGO_PX && b.props.height === LOGO_PX)).toBe(true)
+  expect(logos[0]!.props.source).toContain(OPENAI_LOGO)
+  expect(logos[1]!.props.source).toContain(GEMINI_LOGO)
+  expect(logos[0]!.props.source).toContain('<circle') // 테마를 알 수 없어 검은 원 위에 흰 매듭으로 그린다
+  expect(logos[0]!.props.source).toContain('fill="#fff"')
+  expect(logos[1]!.props.source).toContain('#3186FF')
+  expect((await wide.findAll({ type: 'Text' })).some((t: any) => /Codex|Gemini/.test(t.text))).toBe(false)
+  await wide.unmount()
+
+  for (const [surface, columns] of [['desktop', 50], ['terminal', 85]] as const) {
+    const ui = await mount(surface, columns)
+    expect((await ui.find({ type: 'Text', text: /Codex/ }))?.text).toContain('Codex')
+    expect((await ui.findAll({ type: 'Svg' })).some((b: any) => b.props.alt === 'Codex')).toBe(false)
+    await ui.unmount()
+  }
+})
+
+test('a source with no logo keeps its name on the desktop', () => {
+  expect(logoSvg(OPENAI_LOGO)).toContain(OPENAI_LOGO)
+  const rows = formatRows([{ label: 'New', reading: percent(10, HOUR) }], NOW)
+  expect(rows[0]![0]!.source).toBe('New')
+  expect(rows[0]![0]!.logo).toBeUndefined()
 })

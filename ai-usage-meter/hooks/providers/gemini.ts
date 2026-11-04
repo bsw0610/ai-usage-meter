@@ -1,6 +1,7 @@
 import type { ProcessRunResult } from 'claude-code'
 
 import { parseUsage } from './gemini-parse'
+import { GEMINI_LOGO } from './logos'
 import { ReadFailure } from './types'
 import type { Provider } from './types'
 
@@ -15,6 +16,7 @@ export const gemini: Provider = {
   id: 'gemini',
   label: 'Gemini(AG)',
   short: 'AG',
+  logo: GEMINI_LOGO,
   ttlMs: 15 * 60_000,
   retryMs: 30 * 60_000,
   read: async io => {

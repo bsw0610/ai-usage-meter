@@ -31,6 +31,8 @@ export type Provider = {
   id: string
   label: string
   short: string
+  // 막대를 그리는 데스크톱 줄에서 이름 대신 그릴 로고의 SVG 내용(24×24).
+  logo?: string
   // 실패하면 ReadFailure를 던진다. null은 이유 없이 값을 모른다는 뜻이다.
   read: (io: Io) => Promise<Reading | null>
   // 조회 간격(기본 3분)과 실패한 뒤 다시 시도하기까지의 간격(기본은 조회 간격과 같음).

@@ -1,6 +1,6 @@
 {
   "name": "ai-usage-meter",
-  "version": "0.10.1",
+  "version": "0.11.0",
   "description": "Shows Codex and Gemini (Antigravity) usage in a band above the prompt.",
   "types": "./types/index.d.ts",
   "userConfig": {

@@ -4,7 +4,7 @@ import { DEFAULT_TTL_MS } from './providers/types'
 // 값을 그릴 수 없는 이유. 없으면 아직 결과가 없다는 뜻이다.
 type Trouble = 'failed' | 'missing' | 'stale'
 
-type Entry = { label: string; short?: string; reading: Reading | null | undefined; trouble?: Trouble }
+type Entry = { label: string; short?: string; logo?: string; reading: Reading | null | undefined; trouble?: Trouble }
 
 // 줄의 한 조각. 기본은 흐리게 그린다. isStrong은 사용률처럼 먼저 읽혀야 하는 값이다.
 export type Part = { text: string; color?: 'warning' | 'error'; isStrong?: boolean }
@@ -12,8 +12,8 @@ export type Part = { text: string; color?: 'warning' | 'error'; isStrong?: boole
 export type Bar = { percent: number }
 
 // 한도 하나의 표시. Svg를 그리는 표면은 칸별로, 터미널은 한 줄로 합쳐 그린다.
-// source: 소스 이름(줄의 첫 칸). label: 한도 이름. value: 사용률이나 줄표. reset: 리셋까지 남은 시간.
-export type Cell = { source?: string; label: string; bar?: Bar; value: string; reset?: string; color?: Part['color'] }
+// source: 소스 이름(줄의 첫 칸). logo: 이름 대신 그릴 수 있는 로고의 SVG 내용. label: 한도 이름. value: 사용률이나 줄표. reset: 리셋까지 남은 시간.
+export type Cell = { source?: string; logo?: string; label: string; bar?: Bar; value: string; reset?: string; color?: Part['color'] }
 
 type Step = { hasBar?: boolean; detail?: 'exact' | 'hours'; isShort?: boolean; hasNoSlot?: boolean }
 
@@ -139,12 +139,19 @@ export function barSvg({ percent }: Bar, color?: Part['color']): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${BAR_WIDTH_PX}" height="${BAR_HEIGHT_PX}" viewBox="0 0 ${BAR_WIDTH_PX} ${BAR_HEIGHT_PX}">${line(at(0), at(1), BAR_TRACK)}${fill}</svg>`
 }
 
-export const RESET_ICON_PX = 14
 const RESET_ICON_COLOR = 'rgba(140,140,140,0.95)' // 밝은 화면과 어두운 화면 모두에서 흐린 글자처럼 보이는 색
 
+export const LOGO_PX = 16
+
+// 로고 내용(24×24)을 그림으로. 색은 로고가 정한다.
+export const logoSvg = (content: string): string =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${LOGO_PX}" height="${LOGO_PX}" viewBox="0 0 24 24">${content}</svg>`
+
+export const RESET_ICON_PX = 14
+
 // 앱의 글꼴로 그린 ↻는 작고 크기도 바꿀 수 없어, 데스크톱에서는 아이콘으로 그린다.
-export function resetIconSvg(color?: Part['color']): string {
-  const stroke = color ? BAR_COLORS[color] : RESET_ICON_COLOR
+export function resetIconSvg(): string {
+  const stroke = RESET_ICON_COLOR
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${RESET_ICON_PX}" height="${RESET_ICON_PX}" viewBox="0 0 24 24" fill="none" stroke="${stroke}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19.36 16.25A8.5 8.5 0 1 1 18 6l2.5 2.5"/><path d="M20.5 3.5v5h-5"/></svg>`
 }
 
@@ -185,15 +192,16 @@ function isMoreUrgent(a: PercentLimit, b: PercentLimit, now: number): boolean {
 // 소스 하나의 칸들. 나란히 놓을 수 없으면 더 급한 한도 하나만 남긴다.
 function cellsOf(e: Entry, now: number, step: Step, isStacked: boolean, text: Strings): Cell[] {
   const source = step.isShort ? (e.short ?? e.label) : e.label
+  const named = { source, ...(e.logo ? { logo: e.logo } : {}) }
   const r = e.reading
-  if (!r) return [{ source, label: '', value: step.detail && e.trouble ? `${DASH} ${text.trouble[e.trouble]}` : DASH }]
+  if (!r) return [{ ...named, label: '', value: step.detail && e.trouble ? `${DASH} ${text.trouble[e.trouble]}` : DASH }]
   if (r.kind === 'count') {
     const count = shortCount(r.count)
-    return [{ source, label: '', value: step.isShort ? count : `${count} ${r.unit}` }]
+    return [{ ...named, label: '', value: step.isShort ? count : `${count} ${r.unit}` }]
   }
   // 가장 좁을 때는 첫 칸이 5시간 한도라는 것을 이름 없이 둔다.
   const firstName = r.isWeekly ? text.weeklyShort : step.isShort ? '' : FIVE_HOUR_NAME
-  const primary = { source, label: firstName, ...limitCell(r, now, step, text) }
+  const primary = { ...named, label: firstName, ...limitCell(r, now, step, text) }
   // 따로 잡히는 한도는 막대와 슬롯 없이 그린다. 줄이 길어 분 단위가 먼저 사라지는 일을 막고, 위험은 색으로 보인다.
   const others: { name: string; limit: PercentLimit; step: Step }[] = [
     ...(r.secondary ? [{ name: text.weeklyShort, limit: r.secondary, step }] : []),
@@ -203,7 +211,7 @@ function cellsOf(e: Entry, now: number, step: Step, isStacked: boolean, text: St
   let urgent: (typeof others)[number] | undefined
   for (const o of others) if (isMoreUrgent(o.limit, urgent?.limit ?? r, now)) urgent = o
   if (!urgent) return [primary]
-  return [{ source, label: urgent.limit === r.extra ? r.extra.label : urgent.name, ...limitCell(urgent.limit, now, urgent.step, text) }]
+  return [{ ...named, label: urgent.limit === r.extra ? r.extra.label : urgent.name, ...limitCell(urgent.limit, now, urgent.step, text) }]
 }
 
 // 여러 줄일 때 위아래가 맞도록, 칸 번호별로 조각의 폭을 잰다.
@@ -242,7 +250,8 @@ export function partsOf(cells: Cell[], widths: ColumnWidths = columnWidths([cell
     add({ text: `${j ? ` ${SEPARATOR} ` : ''}${named(c.source ?? '', widths.source[j])}${named(c.label, widths.label[j])}` })
     if (c.bar) add({ text: `${barText(c.bar)} `, ...(c.color ? { color: c.color } : {}) })
     add({ text: isLast && !c.reset ? c.value : padTo(c.value, widths.value[j]), isStrong: true, ...(c.color ? { color: c.color } : {}) })
-    if (c.reset) add({ text: ` ${isLast ? c.reset : padTo(c.reset, resetWidth)}`, ...(c.color ? { color: c.color } : {}) })
+    // 리셋은 한도 색을 따르지 않고 늘 흐리게 그린다.
+    if (c.reset) add({ text: ` ${isLast ? c.reset : padTo(c.reset, resetWidth)}` })
     else if (!isLast && resetWidth) add({ text: ' '.repeat(resetWidth + 1) })
   })
   return parts
@@ -279,7 +288,7 @@ export const formatLine = (entries: Entry[], now = 0, columns = Infinity, maxRow
 // 등록된 목록과 저장된 readings를 합쳐 줄로. 목록이 무엇이든 상관없다.
 // 수명(기본은 조회 간격의 2배)이 지난 값은 없는 값으로 그린다.
 export function rowsFor(
-  list: { id: string; label: string; short?: string; ttlMs?: number; maxAgeMs?: number }[],
+  list: { id: string; label: string; short?: string; logo?: string; ttlMs?: number; maxAgeMs?: number }[],
   readings: Record<string, Reading | null>,
   now = 0,
   columns = Infinity,
@@ -291,10 +300,11 @@ export function rowsFor(
     list.map(p => {
       const r = readings[p.id]
       const maxAge = p.maxAgeMs ?? 2 * (p.ttlMs ?? DEFAULT_TTL_MS)
-      if (r && now - r.observedAt <= maxAge) return { label: p.label, short: p.short, reading: r }
+      const named = { label: p.label, short: p.short, ...(p.logo ? { logo: p.logo } : {}) }
+      if (r && now - r.observedAt <= maxAge) return { ...named, reading: r }
       const last = attempts[p.id]
       const trouble = last && !last.isOk ? (last.isMissing ? 'missing' : 'failed') : r ? 'stale' : undefined
-      return { label: p.label, short: p.short, reading: null, ...(trouble ? { trouble } : {}) }
+      return { ...named, reading: null, ...(trouble ? { trouble } : {}) }
     }),
     now,
     columns,

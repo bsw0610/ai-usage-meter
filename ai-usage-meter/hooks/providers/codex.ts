@@ -2,6 +2,7 @@ import type { ProcessRunResult } from 'claude-code'
 
 import type { Reading } from '../../types/index'
 import { parseLive, parseRollout } from './codex-parse'
+import { OPENAI_LOGO } from './logos'
 import { ReadFailure } from './types'
 import type { Io, Provider } from './types'
 
@@ -73,6 +74,7 @@ export const codex: Provider = {
   id: 'codex',
   label: 'Codex',
   short: 'Cx',
+  logo: OPENAI_LOGO,
   read: async io => {
     const now = await io.now()
     let live: ReadFailure

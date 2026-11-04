@@ -2,7 +2,7 @@ import type { Register, RenderChildren } from 'claude-code'
 
 import type {} from '../types/index'
 import type { Cell } from './format'
-import { BAR_HEIGHT_PX, BAR_WIDTH_PX, DEFAULT_LANG, RESET_ICON_PX, barAlt, barSvg, columnWidths, isLang, partsOf, resetAlt, resetIconSvg, resetTime, rowsFor } from './format'
+import { BAR_HEIGHT_PX, BAR_WIDTH_PX, DEFAULT_LANG, LOGO_PX, RESET_ICON_PX, barAlt, barSvg, columnWidths, isLang, logoSvg, partsOf, resetAlt, resetIconSvg, resetTime, rowsFor } from './format'
 import { providers } from './providers'
 import { pullFromStore, put, refreshDue } from './readings'
 
@@ -81,7 +81,11 @@ export const register: Register = (on, options) => {
             const isLast = j === cells.length - 1
             return [
               ...(j ? [textOf('│')] : []),
-              ...(c.source !== undefined ? [sized(textOf(c.source), widths.source[j])] : []),
+              ...(c.logo
+                ? [<Svg source={logoSvg(c.logo)} alt={c.source ?? ''} width={LOGO_PX} height={LOGO_PX} />]
+                : c.source !== undefined
+                  ? [sized(textOf(c.source), widths.source[j])]
+                  : []),
               ...(widths.label[j] ? [sized(textOf(c.label), widths.label[j])] : []),
               ...(c.bar ? [<Svg source={barSvg(c.bar, c.color)} alt={barAlt(c.bar, lang)} width={BAR_WIDTH_PX} height={BAR_HEIGHT_PX} />] : []),
               percentOf(c, isLast && !c.reset ? undefined : widths.value[j]),
@@ -89,8 +93,8 @@ export const register: Register = (on, options) => {
                 ? [
                     sized(
                       <Box flexDirection="row" alignItems="center" columnGap={1}>
-                        <Svg source={resetIconSvg(c.color)} alt={resetAlt(lang)} width={RESET_ICON_PX} height={RESET_ICON_PX} />
-                        {valueOf(resetTime(c.reset), c.color, false)}
+                        <Svg source={resetIconSvg()} alt={resetAlt(lang)} width={RESET_ICON_PX} height={RESET_ICON_PX} />
+                        {valueOf(resetTime(c.reset), undefined, false)}
                       </Box>,
                       isLast ? undefined : widths.reset[j],
                     ),
