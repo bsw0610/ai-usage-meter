@@ -103,7 +103,7 @@ claude plugin validate ai-usage-meter
 
 ## Credits and trademarks
 
-This is an independent project, not affiliated with or endorsed by OpenAI or Google. ChatGPT, Codex, Gemini and Antigravity are trademarks of their respective owners, and the logos are used only to identify each source. Logo artwork comes from [LobeHub Icons](https://github.com/lobehub/lobe-icons); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+This is an independent project, not affiliated with or endorsed by OpenAI or Google. ChatGPT, Codex, Gemini and Antigravity are trademarks of their respective owners, and the logos are used only to identify each source. Logo artwork comes from [LobeHub Icons](https://github.com/lobehub/lobe-icons); see [THIRD_PARTY_NOTICES.md](ai-usage-meter/THIRD_PARTY_NOTICES.md).
 
 ## License
 
