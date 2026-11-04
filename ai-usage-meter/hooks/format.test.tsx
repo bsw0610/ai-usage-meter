@@ -697,8 +697,9 @@ test('on the desktop a logo stands in for the source name where bars are drawn; 
   expect(logos.every((b: any) => b.props.width === LOGO_PX && b.props.height === LOGO_PX)).toBe(true)
   expect(logos[0]!.props.source).toContain(OPENAI_LOGO)
   expect(logos[1]!.props.source).toContain(GEMINI_LOGO)
-  expect(logos[0]!.props.source).toContain('<circle') // 테마를 알 수 없어 검은 원 위에 흰 매듭으로 그린다
-  expect(logos[0]!.props.source).toContain('fill="#fff"')
+  expect(logos[0]!.props.source).not.toContain('<circle')
+  expect(logos[0]!.props.source).toContain('path{fill:#000}') // 라이트 모드는 검정
+  expect(logos[0]!.props.source).toContain('@media (prefers-color-scheme:dark){path{fill:#fff}}') // 다크 모드는 흰색
   expect(logos[1]!.props.source).toContain('#3186FF')
   expect((await wide.findAll({ type: 'Text' })).some((t: any) => /Codex|Gemini/.test(t.text))).toBe(false)
   await wide.unmount()
