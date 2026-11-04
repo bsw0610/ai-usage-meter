@@ -58,9 +58,10 @@ export const register: Register = (on, options) => {
         )
       }
       const { Svg } = $.ui.resolve(e)
-      // 여러 줄일 때만 폭을 고정해 위아래를 맞춘다. 줄 끝의 값은 고정하지 않는다.
+      // 여러 줄일 때만 최소 폭을 줘 위아래를 맞춘다. 줄 끝의 값은 주지 않는다.
+      // 칸 수는 고정폭 글꼴 기준이고 앱의 글자는 비례폭이라, 폭을 고정하면 넓은 글자가 많은 값이 잘린다.
       const sized = (node: RenderChildren, width: number | undefined) =>
-        rows.length > 1 && width !== undefined ? <Box width={width}>{node}</Box> : node
+        rows.length > 1 && width !== undefined ? <Box minWidth={width}>{node}</Box> : node
       return (
         <Box flexDirection="row" alignItems="center" columnGap={1}>
           {cells.flatMap((c, j) => [

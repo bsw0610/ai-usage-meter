@@ -158,6 +158,6 @@ test('one agy run reaches the band with the Argon limit', async ($, on) => {
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal', props: { ...BAND.props, bodyColumns: 200 } })
   const text: string | undefined = (await ui.find({ type: 'Text', text: /Argon/ }))?.text
   await ui.unmount()
-  expect(text).toContain('Argon ╸───────── 3%')
+  expect(text).toContain('Argon 3%')
   expect(calls.filter(a => a[0] === 'agy').length).toBe(1)
 })

@@ -14,11 +14,12 @@ export type Bar = { percent: number }
 // 한도 하나의 표시. Svg를 그리는 표면은 칸별로, 터미널은 한 줄로 합쳐 그린다.
 export type Cell = { label: string; bar?: Bar; value: string; color?: Part['color'] }
 
-type Step = { hasBar?: boolean; detail?: 'full' | 'hours'; isShort?: boolean }
+type Step = { hasBar?: boolean; detail?: 'full' | 'exact' | 'hours'; isShort?: boolean }
 
 // 넓은 순서. 앞에서부터 들어맞는 첫 단계를 쓰고, 어느 것도 안 맞으면 마지막 단계를 쓴다(끝은 Text가 자른다).
 const STEPS: Step[] = [
   { hasBar: true, detail: 'full' },
+  { hasBar: true, detail: 'exact' },
   { hasBar: true, detail: 'hours' },
   { detail: 'full' },
   { detail: 'hours' },
@@ -148,6 +149,7 @@ function limitCell(r: PercentLimit, now: number, step: Step, text: Strings): Omi
   const tail =
     left === undefined ? undefined
     : step.detail === 'full' ? text.reset(until(left, text))
+    : step.detail === 'exact' ? until(left, text)
     : step.detail === 'hours' ? until(left)
     : undefined
   return {
@@ -173,14 +175,15 @@ function cellsOf(e: Entry, now: number, step: Step, isStacked: boolean, text: St
     return [{ label, value: step.isShort ? count : `${count} ${r.unit}` }]
   }
   const primary = { label, ...limitCell(r, now, step, text) }
-  const others: { name: string; limit: PercentLimit }[] = [
-    ...(r.secondary ? [{ name: step.isShort ? text.weeklyShort : text.weekly, limit: r.secondary }] : []),
-    ...(r.extra ? [{ name: step.isShort ? r.extra.short : r.extra.label, limit: r.extra }] : []),
+  // 따로 잡히는 한도는 막대 없이 그린다. 줄이 길어 분 단위가 먼저 사라지는 일을 막고, 위험은 빨간색으로 보인다.
+  const others: { name: string; limit: PercentLimit; step: Step }[] = [
+    ...(r.secondary ? [{ name: step.isShort ? text.weeklyShort : text.weekly, limit: r.secondary, step }] : []),
+    ...(r.extra ? [{ name: step.isShort ? r.extra.short : r.extra.label, limit: r.extra, step: { ...step, hasBar: false } }] : []),
   ]
-  if (isStacked) return [primary, ...others.map(o => ({ label: o.name, ...limitCell(o.limit, now, step, text) }))]
+  if (isStacked) return [primary, ...others.map(o => ({ label: o.name, ...limitCell(o.limit, now, o.step, text) }))]
   let urgent: (typeof others)[number] | undefined
   for (const o of others) if (isMoreUrgent(o.limit, urgent?.limit ?? r, now)) urgent = o
-  return [urgent ? { label: `${label} ${urgent.name}`, ...limitCell(urgent.limit, now, step, text) } : primary]
+  return [urgent ? { label: `${label} ${urgent.name}`, ...limitCell(urgent.limit, now, urgent.step, text) } : primary]
 }
 
 // 여러 줄일 때 위아래가 맞도록, 칸 번호별로 이름과 값의 폭을 잰다.

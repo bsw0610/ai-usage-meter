@@ -285,6 +285,20 @@ test('the band draws one row per source, on both surfaces', async ($, on) => {
   await oneRow.unmount()
 })
 
+// 칸 수는 고정폭 글꼴 기준인데 앱의 글자는 비례폭이라, "48% 4h39m"처럼 넓은 글자가 많으면 칸 수보다 길어진다.
+test('on the desktop a column only sets a minimum, so its widest value is never cut', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  const value = { codex: both(48, 4.65 * HOUR, 54, 21 * HOUR), gemini: both(0, 5 * HOUR, 0, 7 * DAY) }
+  on('state.get', () => ({ value: { value, version: 0 } }))
+  on('ui.render', () => ({ type: 'engine', ref: 0 }))
+  const props = { hasSurvey: false, isWorking: false, bodyColumns: 85, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} }
+  const ui = await $.ui.mount({ plugin: 'ai-usage-meter', component: 'AbovePrompt', requestId: 'band', surface: 'desktop', props })
+  const boxes = (await ui.findAll({ type: 'Box' })).map((b: any) => b.props)
+  expect(boxes.filter((b: any) => typeof b.minWidth === 'number').length).toBeGreaterThan(0)
+  expect(boxes.filter((b: any) => typeof b.width === 'number')).toEqual([])
+  await ui.unmount()
+})
+
 test('each language has its own words for the reset, the days, the weekly limit and the bar', () => {
   const list = [{ label: 'Codex', short: 'Cx', reading: both(82, 3.116 * HOUR, 46, 45 * HOUR) }]
   const line = (lang: 'en' | 'ja', columns = Infinity) => formatLine(list, NOW, columns, Infinity, lang)
@@ -453,18 +467,40 @@ const withArgon = [
 test('a third limit joins its source row, and the rows above keep their columns', () => {
   expect(formatLine(withArgon, NOW).split('\n')).toEqual([
     'Codex      ━━━━━━━━── 82% (resets 3h7m) · Weekly ━━━━╸───── 46% (resets 1d 21h)',
-    'Gemini(AG) ━━╸─────── 25% (resets 3h)   · Weekly ━───────── 10% (resets 5d)     · Argon ╸───────── 3% (resets 6d)',
+    'Gemini(AG) ━━╸─────── 25% (resets 3h)   · Weekly ━───────── 10% (resets 5d)     · Argon 3% (resets 6d)',
   ])
   expect(formatLine(withArgon, NOW, 10).split('\n')).toEqual(['Cx 82% · Wk 46%', 'AG 25% · Wk 10% · Ar 3%'])
 })
 
-test('at the width of a real window, every language keeps the third limit by narrowing all rows', () => {
-  for (const lang of ['en', 'ja', 'ko'] as const) {
-    const rows = formatLine(withArgon, NOW, 85, Infinity, lang).split('\n')
-    expect(rows.every(r => displayWidth(r) <= 85)).toBe(true)
-    expect(rows[1]).toContain('· Argon ╸───────── 3% 6d')
-    expect(rows[0]).toContain('82% 3h') // 대신 모든 줄이 시간 단위로 줄어든다
+test('at the width of a real window, every language keeps the third limit and the minutes', () => {
+  const rows = (lang: 'ko' | 'en' | 'ja') => formatLine(withArgon, NOW, 85, Infinity, lang).split('\n')
+  expect(rows('en')).toEqual([
+    'Codex      ━━━━━━━━── 82% 3h7m · Weekly ━━━━╸───── 46% 1d 21h',
+    'Gemini(AG) ━━╸─────── 25% 3h   · Weekly ━───────── 10% 5d     · Argon 3% 6d',
+  ])
+  expect(rows('ko')).toEqual([
+    'Codex      ━━━━━━━━── 82% 3h7m · 주간 ━━━━╸───── 46% 1일 21시간',
+    'Gemini(AG) ━━╸─────── 25% 3h   · 주간 ━───────── 10% 5일        · Argon 3% 6일',
+  ])
+  expect(rows('ja')).toEqual([
+    'Codex      ━━━━━━━━── 82% 3h7m · 週間 ━━━━╸───── 46% 1日21時間',
+    'Gemini(AG) ━━╸─────── 25% 3h   · 週間 ━───────── 10% 5日       · Argon 3% 6日',
+  ])
+  for (const lang of ['en', 'ja', 'ko'] as const) expect(rows(lang).every(r => displayWidth(r) <= 85)).toBe(true)
+})
+
+test('a third limit never draws a bar, at any width', () => {
+  for (const w of [Infinity, 120, 85, 60, 40]) {
+    const cells = formatRows(withArgon, NOW, w)[1]!
+    expect(cells[2]!.label).toBe('Argon')
+    expect(cells[2]!.bar).toBeUndefined()
   }
+})
+
+test('with too little room for the minutes, the rows fall back to whole hours', () => {
+  const narrow = formatLine(withArgon, NOW, 70).split('\n')
+  expect(narrow[0]).toBe('Codex      ━━━━━━━━── 82% 3h · Weekly ━━━━╸───── 46% 45h')
+  expect(narrow[1]).toBe('Gemini(AG) ━━╸─────── 25% 3h · Weekly ━───────── 10% 5d  · Argon 3% 6d')
 })
 
 test('a third limit is colored on its own', () => {
@@ -482,6 +518,6 @@ test('with room for one row, a third limit shows when it is the most urgent', ()
 
 test('a third limit shows without a weekly limit, and without one nothing changes', () => {
   const alone = { ...percent(25, 3 * HOUR), extra: argon(3, 6 * DAY) }
-  expect(formatLine([{ label: 'A', reading: alone }], NOW)).toBe('A ━━╸─────── 25% (resets 3h) · Argon ╸───────── 3% (resets 6d)')
+  expect(formatLine([{ label: 'A', reading: alone }], NOW)).toBe('A ━━╸─────── 25% (resets 3h) · Argon 3% (resets 6d)')
   expect(formatLine([{ label: 'A', reading: both(25, 3 * HOUR, 10, 5 * DAY) }], NOW)).not.toContain('Argon')
 })
