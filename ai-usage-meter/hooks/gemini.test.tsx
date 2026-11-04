@@ -19,7 +19,7 @@ const BAND = {
   props: { hasSurvey: false, isWorking: false, bodyColumns: 30, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
 } as const
 
-type Run = 'ok' | 'exit1' | 'throw' | 'garbage' | 'login'
+type Run = 'ok' | 'exit1' | 'throw' | 'garbage' | 'login' | 'argon'
 
 function world(on: any, run: Run) {
   const clock = mock.clock(on, { now: NOW })
@@ -41,7 +41,7 @@ function world(on: any, run: Run) {
     if (run === 'exit1') return { value: { exitCode: 1, stdout: '', stderr: 'x' } }
     if (run === 'garbage') return { value: { exitCode: 0, stdout: 'no rows here', stderr: '' } }
     if (run === 'login') return { value: { exitCode: 0, stdout: 'Please sign in to continue\n', stderr: '' } }
-    return { value: { exitCode: 0, stdout: SAMPLE + '\n', stderr: '' } }
+    return { value: { exitCode: 0, stdout: (run === 'argon' ? WITH_ARGON : SAMPLE) + '\n', stderr: '' } }
   })
   return { clock, calls, envs }
 }
@@ -122,4 +122,42 @@ test('agy runs with its self-updater turned off', async ($, on) => {
   const i = calls.findIndex(argv => argv[0] === 'agy')
   expect(i).toBeGreaterThanOrEqual(0)
   expect(envs[i]).toEqual({ AGY_CLI_DISABLE_AUTO_UPDATE: 'true' })
+})
+
+// agy 1.4.12의 출력 모양. 값은 가짜다. Argon 줄만 이름에 "Remaining"이 없지만 값은 똑같이 남은 %다.
+const WITH_ARGON = [
+  row('Gemini Models', 'Weekly Limit Remaining', '90%', '2026-11-10T00:00:00Z'),
+  row('Gemini Models', 'Five Hour Limit Remaining', '75%', '2026-11-04T13:00:00Z'),
+  row('Claude and GPT models', 'Weekly Limit Remaining', '10%', '2026-11-10T00:00:00Z'),
+  row('Claude and GPT models', 'Five Hour Limit Remaining', '10%', '2026-11-04T13:00:00Z'),
+  row('Gemini 4 Argon', 'Gemini 4 Argon Weekly Limit', '97%', '2026-11-09T12:00:00Z'),
+].join('\n')
+
+test('parseUsage: the Argon weekly limit comes along as used percent', () => {
+  expect(parseUsage(WITH_ARGON, NOW)).toEqual({
+    kind: 'percent',
+    percent: 25,
+    resetsAt: Date.parse('2026-11-04T13:00:00Z'),
+    secondary: { percent: 10, resetsAt: Date.parse('2026-11-10T00:00:00Z') },
+    extra: { label: 'Argon', short: 'Ar', percent: 3, resetsAt: Date.parse('2026-11-09T12:00:00Z') },
+    observedAt: NOW,
+  })
+})
+
+test('parseUsage: the Argon group is found under another model version, and is optional', () => {
+  const next = WITH_ARGON.replaceAll('Gemini 4 Argon', 'Gemini 5 Argon')
+  expect((parseUsage(next, NOW) as any).extra.percent).toBe(3)
+  expect(parseUsage(SAMPLE, NOW)).not.toHaveProperty('extra')
+  expect(parseUsage(row('Gemini 4 Argon', 'Gemini 4 Argon Weekly Limit', '97%', 'x'), NOW)).toBeUndefined() // Argon만으로는 값이 아니다
+})
+
+test('one agy run reaches the band with the Argon limit', async ($, on) => {
+  const { clock, calls } = world(on, 'argon')
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await clock.settle()
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal', props: { ...BAND.props, bodyColumns: 200 } })
+  const text: string | undefined = (await ui.find({ type: 'Text', text: /Argon/ }))?.text
+  await ui.unmount()
+  expect(text).toContain('Argon ╸───────── 3%')
+  expect(calls.filter(a => a[0] === 'agy').length).toBe(1)
 })

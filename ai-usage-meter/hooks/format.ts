@@ -173,11 +173,14 @@ function cellsOf(e: Entry, now: number, step: Step, isStacked: boolean, text: St
     return [{ label, value: step.isShort ? count : `${count} ${r.unit}` }]
   }
   const primary = { label, ...limitCell(r, now, step, text) }
-  if (!r.secondary) return [primary]
-  const weekly = limitCell(r.secondary, now, step, text)
-  const weeklyLabel = step.isShort ? text.weeklyShort : text.weekly
-  if (isStacked) return [primary, { label: weeklyLabel, ...weekly }]
-  return [isMoreUrgent(r.secondary, r, now) ? { label: `${label} ${weeklyLabel}`, ...weekly } : primary]
+  const others: { name: string; limit: PercentLimit }[] = [
+    ...(r.secondary ? [{ name: step.isShort ? text.weeklyShort : text.weekly, limit: r.secondary }] : []),
+    ...(r.extra ? [{ name: step.isShort ? r.extra.short : r.extra.label, limit: r.extra }] : []),
+  ]
+  if (isStacked) return [primary, ...others.map(o => ({ label: o.name, ...limitCell(o.limit, now, step, text) }))]
+  let urgent: (typeof others)[number] | undefined
+  for (const o of others) if (isMoreUrgent(o.limit, urgent?.limit ?? r, now)) urgent = o
+  return [urgent ? { label: `${label} ${urgent.name}`, ...limitCell(urgent.limit, now, step, text) } : primary]
 }
 
 // 여러 줄일 때 위아래가 맞도록, 칸 번호별로 이름과 값의 폭을 잰다.
@@ -219,11 +222,11 @@ function render(entries: Entry[], now: number, step: Step, isStacked: boolean, t
   return isStacked ? cells : [cells.flat()]
 }
 
-// 소스 이름을 모른 채 쌍들을 줄로 만든다. 주간 한도까지 온 소스가 있고 maxRows가 허락하면 소스마다 한 줄,
+// 소스 이름을 모른 채 쌍들을 줄로 만든다. 주간 등 한도가 더 온 소스가 있고 maxRows가 허락하면 소스마다 한 줄,
 // 아니면 모두 한 줄이다. columns 칸에 들어가는 가장 자세한 단계를 고른다.
 export function formatRows(entries: Entry[], now = 0, columns = Infinity, maxRows = Infinity, lang: Lang = DEFAULT_LANG): Cell[][] {
   const text = STRINGS[lang]
-  const isStacked = entries.length <= maxRows && entries.some(e => e.reading?.kind === 'percent' && e.reading.secondary)
+  const isStacked = entries.length <= maxRows && entries.some(e => e.reading?.kind === 'percent' && (e.reading.secondary || e.reading.extra))
   for (const step of STEPS) {
     const rows = render(entries, now, step, isStacked, text)
     const widths = columnWidths(rows)

@@ -442,3 +442,46 @@ test('the band sizes its line to bodyColumns, on both surfaces', async ($, on) =
     [10, 'Cx 18% · AG 25%'],
   ])
 })
+
+// Argon처럼 소스에 딸린 세 번째 한도. 표시 이름은 값과 함께 온다.
+const argon = (p: number, left: number) => ({ label: 'Argon', short: 'Ar', percent: p, resetsAt: NOW + left })
+const withArgon = [
+  { label: 'Codex', short: 'Cx', reading: both(82, 3.116 * HOUR, 46, 45 * HOUR) },
+  { label: 'Gemini(AG)', short: 'AG', reading: { ...both(25, 3 * HOUR, 10, 5 * DAY), extra: argon(3, 6 * DAY) } },
+]
+
+test('a third limit joins its source row, and the rows above keep their columns', () => {
+  expect(formatLine(withArgon, NOW).split('\n')).toEqual([
+    'Codex      ━━━━━━━━── 82% (resets 3h7m) · Weekly ━━━━╸───── 46% (resets 1d 21h)',
+    'Gemini(AG) ━━╸─────── 25% (resets 3h)   · Weekly ━───────── 10% (resets 5d)     · Argon ╸───────── 3% (resets 6d)',
+  ])
+  expect(formatLine(withArgon, NOW, 10).split('\n')).toEqual(['Cx 82% · Wk 46%', 'AG 25% · Wk 10% · Ar 3%'])
+})
+
+test('at the width of a real window, every language keeps the third limit by narrowing all rows', () => {
+  for (const lang of ['en', 'ja', 'ko'] as const) {
+    const rows = formatLine(withArgon, NOW, 85, Infinity, lang).split('\n')
+    expect(rows.every(r => displayWidth(r) <= 85)).toBe(true)
+    expect(rows[1]).toContain('· Argon ╸───────── 3% 6d')
+    expect(rows[0]).toContain('82% 3h') // 대신 모든 줄이 시간 단위로 줄어든다
+  }
+})
+
+test('a third limit is colored on its own', () => {
+  const reading = { ...both(10, 4 * HOUR, 20, 4 * DAY), extra: argon(95, 4 * DAY) }
+  expect(formatRows([{ label: 'A', reading }], NOW)[0]!.map(c => c.color)).toEqual([undefined, undefined, 'error'])
+})
+
+test('with room for one row, a third limit shows when it is the most urgent', () => {
+  const line = (extra: ReturnType<typeof argon>) =>
+    formatLine([{ label: 'A', reading: { ...both(10, 4 * HOUR, 20, 4 * DAY), extra } }, { label: 'B', reading: null }], NOW, Infinity, 1)
+  expect(line(argon(95, 4 * DAY))).toContain('A Argon')
+  expect(line(argon(3, 4 * DAY))).not.toContain('Argon')
+  expect(line(argon(95, -HOUR))).not.toContain('Argon') // 리셋이 지난 창은 0%다
+})
+
+test('a third limit shows without a weekly limit, and without one nothing changes', () => {
+  const alone = { ...percent(25, 3 * HOUR), extra: argon(3, 6 * DAY) }
+  expect(formatLine([{ label: 'A', reading: alone }], NOW)).toBe('A ━━╸─────── 25% (resets 3h) · Argon ╸───────── 3% (resets 6d)')
+  expect(formatLine([{ label: 'A', reading: both(25, 3 * HOUR, 10, 5 * DAY) }], NOW)).not.toContain('Argon')
+})
