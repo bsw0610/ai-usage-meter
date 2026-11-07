@@ -43,7 +43,8 @@ export const register: Register = (on, options) => {
 
     const { value = {} } = await $.state.get(readings)
     const { value: lastAttempts = {} } = await $.state.get(attempts)
-    const rows = rowsFor(providers, value, await $.clock.now(), e.props.bodyColumns, e.props.maxRows, lastAttempts, lang)
+    // 데스크톱은 이름 대신 로고를 그리므로, 줄에 들어갈 자세함을 로고 폭으로 잰다.
+    const rows = rowsFor(providers, value, await $.clock.now(), e.props.bodyColumns, e.props.maxRows, lastAttempts, lang, e.surface !== 'terminal')
     const widths = columnWidths(rows)
     const { Box, Text } = $.ui.resolve(e)
     const textOf = (text: string) => <Text dimColor wrap="truncate-end">{text}</Text>
