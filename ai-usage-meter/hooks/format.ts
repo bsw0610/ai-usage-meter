@@ -30,7 +30,6 @@ const STEPS: Step[] = [
 const DASH = '—'
 const ORANGE_FROM_PERCENT = 80
 const RED_FROM_PERCENT = 100 // 다 썼을 때
-const RESET_MARK = '↻'
 const SEPARATOR = '│'
 const FIVE_HOUR_NAME = '5h'
 const PERCENT_SLOT = 4 // "100%"까지 자릿수가 바뀌어도 뒤의 값이 움직이지 않는다
@@ -47,7 +46,6 @@ type Strings = {
   trouble: Record<Trouble, string>
   days: (days: number, hours: number) => string
   weeklyShort: string
-  resets: string
   used: (percent: number) => string
 }
 
@@ -56,21 +54,18 @@ const STRINGS: Record<Lang, Strings> = {
     trouble: { failed: '실패', missing: '미설치', stale: '오래됨' },
     days: (days, hours) => `${days}일${hours ? ` ${hours}시간` : ''}`,
     weeklyShort: '주',
-    resets: '리셋',
     used: percent => `${percent}% 사용`,
   },
   en: {
     trouble: { failed: 'failed', missing: 'not installed', stale: 'stale' },
     days: (days, hours) => `${days}d${hours ? ` ${hours}h` : ''}`,
     weeklyShort: 'Wk',
-    resets: 'resets',
     used: percent => `${percent}% used`,
   },
   ja: {
     trouble: { failed: '失敗', missing: '未インストール', stale: '古い値' },
     days: (days, hours) => `${days}日${hours ? `${hours}時間` : ''}`,
     weeklyShort: '週',
-    resets: 'リセット',
     used: percent => `${percent}%使用`,
   },
 }
@@ -139,26 +134,11 @@ export function barSvg({ percent }: Bar, color?: Part['color']): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${BAR_WIDTH_PX}" height="${BAR_HEIGHT_PX}" viewBox="0 0 ${BAR_WIDTH_PX} ${BAR_HEIGHT_PX}">${line(at(0), at(1), BAR_TRACK)}${fill}</svg>`
 }
 
-const RESET_ICON_COLOR = 'rgba(140,140,140,0.95)' // 밝은 화면과 어두운 화면 모두에서 흐린 글자처럼 보이는 색
-
 export const LOGO_PX = 16
 
 // 로고 내용(24×24)을 그림으로. 색은 로고가 정한다.
 export const logoSvg = (content: string): string =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${LOGO_PX}" height="${LOGO_PX}" viewBox="0 0 24 24">${content}</svg>`
-
-export const RESET_ICON_PX = 14
-
-// 앱의 글꼴로 그린 ↻는 작고 크기도 바꿀 수 없어, 데스크톱에서는 아이콘으로 그린다.
-export function resetIconSvg(): string {
-  const stroke = RESET_ICON_COLOR
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${RESET_ICON_PX}" height="${RESET_ICON_PX}" viewBox="0 0 24 24" fill="none" stroke="${stroke}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19.36 16.25A8.5 8.5 0 1 1 18 6l2.5 2.5"/><path d="M20.5 3.5v5h-5"/></svg>`
-}
-
-// Cell.reset에서 문자 표시를 뺀 시간. 아이콘 옆에 쓴다.
-export const resetTime = (reset: string): string => reset.slice(RESET_MARK.length + 1)
-
-export const resetAlt = (lang: Lang = DEFAULT_LANG): string => STRINGS[lang].resets
 
 export const barAlt = ({ percent }: Bar, lang: Lang = DEFAULT_LANG): string => STRINGS[lang].used(Math.round(percent))
 
@@ -178,7 +158,7 @@ function limitCell(r: PercentLimit, now: number, step: Step, text: Strings): Omi
   return {
     ...(step.hasBar ? { bar: { percent: r.percent } } : {}),
     value: slot(`${shown}%`),
-    ...(time ? { reset: `${RESET_MARK} ${time}` } : {}),
+    ...(time ? { reset: time } : {}),
     ...(color ? { color } : {}),
   }
 }

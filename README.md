@@ -42,7 +42,7 @@ A source whose program isn't on the session's `PATH` gets no row, and its row co
 | `Wk` | The weekly limit |
 | `Ar` | Antigravity's separate weekly limit for Gemini Argon |
 | Bar and `%` | How much of the limit you have used |
-| `↻` | Time until the limit resets |
+| Time after `%` | Time until the limit resets |
 | `—` | No value yet. With enough room, it also says `failed`, `not installed` or `stale`. |
 
 | Used | Color |
@@ -56,8 +56,8 @@ The band gives up detail as the window narrows: first the minutes, then the bars
 In a terminal, the same information is drawn with text:
 
 ```
-Codex      5h ━━━━──────  41% ↻ 4h46m │ Wk ━━━━━━━━╸─  85% ↻ 21h13m
-Gemini(AG) 5h ━─────────  12% ↻ 2h31m │ Wk ━━━───────  30% ↻ 5d 18h │ Ar 3% ↻ 5d 18h
+Codex      5h ━━━━──────  41% 4h46m │ Wk ━━━━━━━━╸─  85% 21h13m
+Gemini(AG) 5h ━─────────  12% 2h31m │ Wk ━━━───────  30% 5d 18h │ Ar 3% 5d 18h
 ```
 
 ## Settings
