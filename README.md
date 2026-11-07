@@ -51,13 +51,13 @@ A source whose program isn't on the session's `PATH` gets no row, and its row co
 | 80–99% | Orange |
 | 100% | Red and bold |
 
-The band gives up detail as the window narrows: first the minutes, then the bars, then the long names, and finally the reset times.
+The band gives up detail as the window narrows: first the Argon bar, then the minutes, then the other bars, then the long names, and finally the reset times.
 
 In a terminal, the same information is drawn with text:
 
 ```
 Codex      5h ━━━━──────  41% 4h46m │ Wk ━━━━━━━━╸─  85% 21h13m
-Gemini(AG) 5h ━─────────  12% 2h31m │ Wk ━━━───────  30% 5d 18h │ Ar 3% 5d 18h
+Gemini(AG) 5h ━─────────  12% 2h31m │ Wk ━━━───────  30% 5d 18h │ Ar ╸───────── 3% 5d 18h
 ```
 
 ## Settings
