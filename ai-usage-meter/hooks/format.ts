@@ -138,6 +138,9 @@ export function barSvg({ percent }: Bar, color?: Part['color']): string {
 
 export const LOGO_PX = 16
 
+// 데스크톱이 이름 대신 그리는 로고가 차지하는 칸 수. 막대가 10칸을 80px로 그리므로 한 칸은 8px로 보고, 16px 로고는 2칸이다.
+const LOGO_CELLS = Math.ceil(LOGO_PX / (BAR_WIDTH_PX / BAR_CELLS))
+
 // 로고 내용(24×24)을 그림으로. 색은 로고가 정한다.
 export const logoSvg = (content: string): string =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${LOGO_PX}" height="${LOGO_PX}" viewBox="0 0 24 24">${content}</svg>`
@@ -246,15 +249,29 @@ function render(entries: Entry[], now: number, step: Step, isStacked: boolean, t
   return isStacked ? cells : [cells.flat()]
 }
 
+// 그려질 폭을 재기 위한 사본. 로고를 그리는 표면에서는 로고가 있는 칸의 이름을 로고 폭의 빈칸으로 바꿔 잰다.
+const LOGO_STAND_IN = ' '.repeat(LOGO_CELLS)
+const asMeasured = (rows: Cell[][], hasLogos: boolean): Cell[][] =>
+  hasLogos ? rows.map(cells => cells.map(c => (c.logo ? { ...c, source: LOGO_STAND_IN } : c))) : rows
+
 // 소스 이름을 모른 채 쌍들을 줄로 만든다. 주간 등 한도가 더 온 소스가 있고 maxRows가 허락하면 소스마다 한 줄,
 // 아니면 모두 한 줄이다. columns 칸에 들어가는 가장 자세한 단계를 고른다.
-export function formatRows(entries: Entry[], now = 0, columns = Infinity, maxRows = Infinity, lang: Lang = DEFAULT_LANG): Cell[][] {
+// hasLogos: 이름 대신 로고를 그리는 표면(데스크톱). 폭을 잴 때만 쓰고, 돌려주는 칸은 그대로다.
+export function formatRows(
+  entries: Entry[],
+  now = 0,
+  columns = Infinity,
+  maxRows = Infinity,
+  lang: Lang = DEFAULT_LANG,
+  hasLogos = false,
+): Cell[][] {
   const text = STRINGS[lang]
   const isStacked = entries.length <= maxRows && entries.some(e => e.reading?.kind === 'percent' && (e.reading.secondary || e.reading.extra))
   for (const step of STEPS) {
     const rows = render(entries, now, step, isStacked, text)
-    const widths = columnWidths(rows)
-    if (rows.every(cells => displayWidth(textOf(partsOf(cells, widths))) <= columns)) return rows
+    const measured = asMeasured(rows, hasLogos)
+    const widths = columnWidths(measured)
+    if (measured.every(cells => displayWidth(textOf(partsOf(cells, widths))) <= columns)) return rows
   }
   return render(entries, now, STEPS[STEPS.length - 1]!, isStacked, text)
 }
@@ -278,6 +295,7 @@ export function rowsFor(
   maxRows = Infinity,
   attempts: Record<string, Attempt> = {},
   lang: Lang = DEFAULT_LANG,
+  hasLogos = false,
 ): Cell[][] {
   const entries: Entry[] = list.map(p => {
     const r = readings[p.id]
@@ -289,7 +307,7 @@ export function rowsFor(
     return { ...named, reading: null, ...(trouble ? { trouble } : {}) }
   })
   const installed = entries.filter(e => e.trouble !== 'missing')
-  return formatRows(installed.length ? installed : entries, now, columns, maxRows, lang)
+  return formatRows(installed.length ? installed : entries, now, columns, maxRows, lang, hasLogos)
 }
 
 export const lineFor = (...args: Parameters<typeof rowsFor>) => lineOf(rowsFor(...args))

@@ -715,7 +715,7 @@ test('on the desktop a logo stands in for the source name at every width; the te
   await wide.unmount()
 
   // 사이드 패널을 열어 막대가 빠지는 폭에서도, 가장 좁은 폭에서도 로고가 남는다.
-  for (const columns of [50, 30, 10]) {
+  for (const columns of [40, 30, 10]) {
     const narrow = await mount('desktop', columns)
     expect((await narrow.findAll({ type: 'Svg' })).filter((b: any) => /%/.test(b.props.alt))).toHaveLength(0)
     expect((await narrow.findAll({ type: 'Svg' })).filter((b: any) => ['Codex', 'Gemini(AG)', 'Cx', 'AG'].includes(b.props.alt))).toHaveLength(2)
@@ -735,4 +735,44 @@ test('a source with no logo keeps its name on the desktop', () => {
   const rows = formatRows([{ label: 'New', reading: percent(10, HOUR) }], NOW)
   expect(rows[0]![0]!.source).toBe('New')
   expect(rows[0]![0]!.logo).toBeUndefined()
+})
+
+// 데스크톱은 이름 대신 16px 로고(2칸)를 그린다. Gemini(AG)는 10칸이라, 가장 긴 줄이 터미널보다 8칸 짧다.
+const logoRows = realRows.map(e => ({ ...e, logo: '<path/>' }))
+const desktopRows = (w: number) => formatRows(logoRows, NOW, w, Infinity, 'en', true)
+const terminalRows = (w: number) => formatRows(logoRows, NOW, w)
+
+test('on the desktop a logo counts as two cells, so each detail stays eight columns narrower than on the terminal', () => {
+  for (let w = 46; w <= 100; w++) expect(desktopRows(w - 8)).toEqual(terminalRows(w))
+  // 사이드 패널을 연 폭: 터미널 기준이면 막대가 빠지지만, 데스크톱은 막대를 지킨다.
+  expect(terminalRows(60).flat().some(c => c.bar)).toBe(false)
+  expect(desktopRows(60).flat().filter(c => c.bar)).toHaveLength(4)
+  // 막대가 빠진 뒤에도 분 단위와 이름 칸(로고 자리)을 더 오래 지킨다.
+  expect(terminalRows(44)[0]![0]).toMatchObject({ source: 'Cx', reset: '5h' })
+  expect(desktopRows(44)[0]![0]).toMatchObject({ source: 'Codex', label: '5h', reset: '4h45m' })
+  // 가장 좁은 단계는 짧은 이름(2칸)이 로고와 같은 폭이라 두 표면이 같다.
+  for (const w of [10, 30, 36]) expect(desktopRows(w)).toEqual(terminalRows(w))
+})
+
+test('the logo measure leaves the terminal and sources with no logo as they were', () => {
+  for (let w = 5; w <= 100; w++) {
+    expect(formatLine(logoRows, NOW, w)).toBe(formatLine(realRows, NOW, w))
+    expect(formatRows(realRows, NOW, w, Infinity, 'en', true)).toEqual(formatRows(realRows, NOW, w))
+    expect(lineFor(providers, {}, NOW, w)).toBe(lineFor(providers, {}, NOW, w, Infinity, {}, 'en', false))
+  }
+})
+
+test('the band keeps its bars on the desktop where the terminal has dropped them', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  const value = { codex: percent(18, 2 * HOUR), gemini: percent(25, 3 * HOUR) }
+  on('state.get', () => ({ value: { value, version: 0 } }))
+  on('ui.render', () => ({ type: 'engine', ref: 0 }))
+  const props = { hasSurvey: false, isWorking: false, bodyColumns: 55, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} }
+  const desktop = await $.ui.mount({ plugin: 'ai-usage-meter', component: 'AbovePrompt', requestId: 'band', surface: 'desktop', props })
+  expect((await desktop.findAll({ type: 'Svg' })).map((b: any) => b.props.alt)).toEqual(['Codex', '18% used', 'Gemini(AG)', '25% used'])
+  expect(await bandText(desktop)).toBe('Codex 5h 18% 2h │ Gemini(AG) 5h 25% 3h') // 로고는 이름으로 읽힌다
+  await desktop.unmount()
+  const terminal = await $.ui.mount({ plugin: 'ai-usage-meter', component: 'AbovePrompt', requestId: 'band', surface: 'terminal', props })
+  expect((await terminal.find({ type: 'Text', text: /Codex/ }))?.text).toBe('Codex 5h  18% 2h │ Gemini(AG) 5h  25% 3h')
+  await terminal.unmount()
 })
