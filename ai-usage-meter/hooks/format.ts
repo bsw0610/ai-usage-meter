@@ -15,10 +15,12 @@ export type Bar = { percent: number }
 // source: 소스 이름(줄의 첫 칸). logo: 이름 대신 그릴 수 있는 로고의 SVG 내용. label: 한도 이름. value: 사용률이나 줄표. reset: 리셋까지 남은 시간.
 export type Cell = { source?: string; logo?: string; label: string; bar?: Bar; value: string; reset?: string; color?: Part['color'] }
 
-type Step = { hasBar?: boolean; detail?: 'exact' | 'hours'; isShort?: boolean; hasNoSlot?: boolean }
+type Step = { hasBar?: boolean; hasExtraBar?: boolean; detail?: 'exact' | 'hours'; isShort?: boolean; hasNoSlot?: boolean }
 
 // 넓은 순서. 앞에서부터 들어맞는 첫 단계를 쓰고, 어느 것도 안 맞으면 마지막 단계를 쓴다(끝은 Text가 자른다).
+// 따로 잡히는 한도(Argon)의 막대는 가장 먼저 내려놓는다. 분 단위가 더 중요하다.
 const STEPS: Step[] = [
+  { hasBar: true, hasExtraBar: true, detail: 'exact' },
   { hasBar: true, detail: 'exact' },
   { hasBar: true, detail: 'hours' },
   { detail: 'exact' },
@@ -182,10 +184,10 @@ function cellsOf(e: Entry, now: number, step: Step, isStacked: boolean, text: St
   // 가장 좁을 때는 첫 칸이 5시간 한도라는 것을 이름 없이 둔다.
   const firstName = r.isWeekly ? text.weeklyShort : step.isShort ? '' : FIVE_HOUR_NAME
   const primary = { ...named, label: firstName, ...limitCell(r, now, step, text) }
-  // 따로 잡히는 한도는 막대와 슬롯 없이 그린다. 줄이 길어 분 단위가 먼저 사라지는 일을 막고, 위험은 색으로 보인다.
+  // 따로 잡히는 한도는 슬롯 없이, 막대는 줄에 자리가 넉넉할 때만 그린다. 줄이 길어 분 단위가 먼저 사라지는 일을 막는다.
   const others: { name: string; limit: PercentLimit; step: Step }[] = [
     ...(r.secondary ? [{ name: text.weeklyShort, limit: r.secondary, step }] : []),
-    ...(r.extra ? [{ name: r.extra.short, limit: r.extra, step: { ...step, hasBar: false, hasNoSlot: true } }] : []),
+    ...(r.extra ? [{ name: r.extra.short, limit: r.extra, step: { ...step, hasBar: !!step.hasExtraBar, hasNoSlot: true } }] : []),
   ]
   if (isStacked) return [primary, ...others.map(o => ({ label: o.name, ...limitCell(o.limit, now, o.step, text) }))]
   let urgent: (typeof others)[number] | undefined

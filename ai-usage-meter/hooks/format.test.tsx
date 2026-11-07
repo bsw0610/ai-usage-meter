@@ -462,7 +462,7 @@ const withArgon = [
 test('a third limit joins its source row, and the rows above keep their columns', () => {
   expect(formatLine(withArgon, NOW).split('\n')).toEqual([
     'Codex      5h ━━━━━━━━──  82% 3h7m │ Wk ━━━━╸─────  46% 1d 21h',
-    'Gemini(AG) 5h ━━╸───────  25% 3h   │ Wk ━─────────  10% 5d     │ Ar 3% 6d',
+    'Gemini(AG) 5h ━━╸───────  25% 3h   │ Wk ━─────────  10% 5d     │ Ar ╸───────── 3% 6d',
   ])
   expect(formatLine(withArgon, NOW, 10).split('\n')).toEqual(['Cx 82% │ Wk 46%', 'AG 25% │ Wk 10% │ Ar 3%'])
 })
@@ -471,8 +471,9 @@ test('at the width of a real window, every language keeps the third limit and th
   const rows = (lang: 'ko' | 'en' | 'ja') => formatLine(withArgon, NOW, 85, Infinity, lang).split('\n')
   expect(rows('en')).toEqual([
     'Codex      5h ━━━━━━━━──  82% 3h7m │ Wk ━━━━╸─────  46% 1d 21h',
-    'Gemini(AG) 5h ━━╸───────  25% 3h   │ Wk ━─────────  10% 5d     │ Ar 3% 6d',
+    'Gemini(AG) 5h ━━╸───────  25% 3h   │ Wk ━─────────  10% 5d     │ Ar ╸───────── 3% 6d',
   ])
+  // 일본어와 한국어는 날짜가 길어 같은 폭에 Argon 막대가 들어가지 않는다. 막대보다 분 단위를 남긴다.
   expect(rows('ko')).toEqual([
     'Codex      5h ━━━━━━━━──  82% 3h7m │ 주 ━━━━╸─────  46% 1일 21시간',
     'Gemini(AG) 5h ━━╸───────  25% 3h   │ 주 ━─────────  10% 5일        │ Ar 3% 6일',
@@ -484,12 +485,17 @@ test('at the width of a real window, every language keeps the third limit and th
   for (const lang of ['en', 'ja', 'ko'] as const) expect(rows(lang).every(r => displayWidth(r) <= 85)).toBe(true)
 })
 
-test('a third limit never draws a bar, at any width', () => {
-  for (const w of [Infinity, 120, 85, 60]) {
-    const cells = formatRows(withArgon, NOW, w)[1]!
-    expect(cells[2]!.label).toBe('Ar')
-    expect(cells[2]!.bar).toBeUndefined()
+test('a third limit draws its bar only with room to spare, and gives it up before the minutes', () => {
+  const third = (w: number) => formatRows(withArgon, NOW, w)[1]![2]!
+  for (const w of [Infinity, 120, 85, 84]) expect(third(w).bar).toEqual({ percent: 3 })
+  for (const w of [83, 60]) {
+    expect(third(w).label).toBe('Ar')
+    expect(third(w).bar).toBeUndefined()
   }
+  expect(formatLine(withArgon, NOW, 83).split('\n')).toEqual([
+    'Codex      5h ━━━━━━━━──  82% 3h7m │ Wk ━━━━╸─────  46% 1d 21h',
+    'Gemini(AG) 5h ━━╸───────  25% 3h   │ Wk ━─────────  10% 5d     │ Ar 3% 6d',
+  ])
 })
 
 test('with too little room for the minutes, the rows fall back to whole hours', () => {
@@ -514,7 +520,7 @@ test('with room for one row, a third limit shows when it is the most urgent', ()
 
 test('a third limit shows without a weekly limit, and without one nothing changes', () => {
   const alone = { ...percent(25, 3 * HOUR), extra: argon(3, 6 * DAY) }
-  expect(formatLine([{ label: 'A', reading: alone }], NOW)).toBe('A 5h ━━╸───────  25% 3h │ Ar 3% 6d')
+  expect(formatLine([{ label: 'A', reading: alone }], NOW)).toBe('A 5h ━━╸───────  25% 3h │ Ar ╸───────── 3% 6d')
   expect(formatLine([{ label: 'A', reading: both(25, 3 * HOUR, 10, 5 * DAY) }], NOW)).not.toContain('Argon')
 })
 
@@ -537,7 +543,7 @@ test('a weekly limit alone keeps saying so on one line, and with a third limit b
   expect(line(weeklyOnly(54, 45 * HOUR))).toContain('A Wk ')
   expect(line(percent(54, 3 * HOUR))).not.toContain('Wk')
   const withThird = { ...weeklyOnly(54, 45 * HOUR), extra: argon(3, 6 * DAY) }
-  expect(formatLine([{ label: 'A', reading: withThird }], NOW)).toBe('A Wk ━━━━━╸────  54% 1d 21h │ Ar 3% 6d')
+  expect(formatLine([{ label: 'A', reading: withThird }], NOW)).toBe('A Wk ━━━━━╸────  54% 1d 21h │ Ar ╸───────── 3% 6d')
   expect(line({ ...withThird, extra: argon(95, 6 * DAY) })).toContain('A Argon ')
 })
 
@@ -568,7 +574,7 @@ const realRows = [
 test('each limit is a named group, and the groups line up across rows', () => {
   expect(formatLine(realRows, NOW, 85).split('\n')).toEqual([
     'Codex      5h ━━━━──────  41% 4h45m │ Wk ━━━━━╸────  53% 21h12m',
-    'Gemini(AG) 5h ──────────   0% 4h45m │ Wk ──────────   0% 7d     │ Ar 3% 6d',
+    'Gemini(AG) 5h ──────────   0% 4h45m │ Wk ──────────   0% 7d     │ Ar ╸───────── 3% 6d',
   ])
 })
 
@@ -642,7 +648,7 @@ test('on the desktop the values keep the app font with digits of one width, and 
   expect(of('41%').props.dimColor).toBeUndefined()
   expect(of('5h').props.mono).toBeUndefined()
   expect(texts.filter((x: any) => x.text === '│')).toHaveLength(3)
-  expect((await ui.findAll({ type: 'Svg' })).filter((b: any) => /%/.test(b.props.alt))).toHaveLength(4)
+  expect((await ui.findAll({ type: 'Svg' })).filter((b: any) => /%/.test(b.props.alt))).toHaveLength(5) // 85칸이면 Argon 막대까지 그린다
   await ui.unmount()
 })
 
