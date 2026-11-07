@@ -1,5 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 
+import { bandText } from './shown'
+
 // 픽스처는 직접 만든 가짜 값이다.
 const NOW = Date.parse('2026-11-04T10:00:00Z')
 const MIN = 60_000
@@ -50,7 +52,7 @@ async function start($: any, clock: { settle: () => Promise<void> }) {
 
 async function line($: any, surface: 'terminal' | 'desktop' = 'desktop') {
   const ui = await $.ui.mount({ ...BAND, surface })
-  const text: string | undefined = (await ui.find({ type: 'Text', text: /Cx/ }))?.text
+  const text: string | undefined = await bandText(ui)
   await ui.unmount()
   return text
 }

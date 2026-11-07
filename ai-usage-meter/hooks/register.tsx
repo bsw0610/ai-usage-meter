@@ -54,7 +54,8 @@ export const register: Register = (on, options) => {
     }
 
     const rowOf = (cells: Cell[]) => {
-      if (e.surface === 'terminal' || !cells.some(c => c.bar)) {
+      // 데스크톱은 막대나 로고가 있으면 칸별로 그린다. 막대를 내려놓은 좁은 줄(사이드 패널을 연 때 등)에서도 로고를 지킨다.
+      if (e.surface === 'terminal' || !cells.some(c => c.bar || c.logo)) {
         // 바깥 Text를 흐리게 하면 안쪽 색까지 흐려지므로, 흐림은 조각마다 건다.
         return (
           <Text wrap="truncate-end">

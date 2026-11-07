@@ -1,5 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 
+import { bandText } from './shown'
+
 import { formatLine, lineFor } from './format'
 import { providers } from './providers'
 
@@ -20,8 +22,7 @@ test('the band shows a dash for every provider, on both surfaces', async ($, on)
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ ...BAND, surface })
-    const line = await ui.find({ type: 'Text', text: /Codex/ })
-    expect(line?.text).toBe('Codex — │ Gemini(AG) —')
+    expect(await bandText(ui)).toBe('Codex — │ Gemini(AG) —')
     await ui.unmount()
   }
 })
@@ -42,12 +43,12 @@ test('the band yields to a survey and keeps what other mods drew', async ($, on)
 
   const ui = await $.ui.mount({ ...BAND, props: { ...BAND.props, hasSurvey: true }, surface: 'desktop' })
   expect(await ui.find({ type: 'Text', text: /other mod/ })).toBeTruthy()
-  expect(await ui.find({ type: 'Text', text: /Codex/ })).toBeFalsy()
+  expect(await bandText(ui)).not.toContain('Codex')
   await ui.unmount()
 
   const ui2 = await $.ui.mount({ ...BAND, surface: 'desktop' })
   expect(await ui2.find({ type: 'Text', text: /other mod/ })).toBeTruthy()
-  expect(await ui2.find({ type: 'Text', text: /Codex/ })).toBeTruthy()
+  expect(await bandText(ui2)).toContain('Codex')
   await ui2.unmount()
 })
 
@@ -69,7 +70,7 @@ test('with nothing beneath but the engine, the band is drawn without its node, o
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ ...BAND, surface })
-    expect((await ui.find({ type: 'Text', text: /Codex/ }))?.text).toBe('Codex — │ Gemini(AG) —')
+    expect(await bandText(ui)).toBe('Codex — │ Gemini(AG) —')
     await ui.unmount()
   }
 })

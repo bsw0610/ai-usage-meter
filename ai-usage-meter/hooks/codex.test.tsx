@@ -1,5 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 
+import { bandText } from './shown'
+
 import { parseRollout } from './providers/codex-parse'
 
 // 픽스처는 모두 직접 만든 가짜 값이다.
@@ -49,7 +51,7 @@ async function shown($: any, clock: { settle: () => Promise<void> }, surface: 't
   await $.session.start({ cwd: '/', surface, isInteractive: true })
   await clock.settle()
   const ui = await $.ui.mount({ ...BAND, surface })
-  const text: string | undefined = (await ui.find({ type: 'Text', text: /Cx/ }))?.text
+  const text: string | undefined = await bandText(ui)
   await ui.unmount()
   return text?.split(' │ ')[0]?.replace(/ +/g, ' ')
 }
@@ -150,7 +152,7 @@ test('only a 7-day window falls back to it', async ($, on) => {
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   await clock.settle()
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop', props: { ...BAND.props, bodyColumns: 12 } })
-  expect((await ui.find({ type: 'Text', text: /Cx/ }))?.text).toBe('Cx Wk 61% │ AG —')
+  expect(await bandText(ui)).toBe('Cx Wk 61% │ AG —')
   await ui.unmount()
 })
 

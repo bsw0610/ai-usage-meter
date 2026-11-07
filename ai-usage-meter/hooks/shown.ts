@@ -1,0 +1,15 @@
+// 테스트용: 그려진 밴드를 한 줄의 글자로 읽는다. 터미널은 Text 하나라 그대로,
+// 데스크톱의 칸별 줄은 칸 사이를 한 칸 띄우고 로고는 이름(alt)으로 읽으며 막대(alt에 %)는 건너뛴다.
+export function shownText(node: unknown): string {
+  if (typeof node === 'string') return node
+  if (typeof node === 'number') return String(node)
+  if (!node || typeof node !== 'object') return ''
+  // 그려진 트리(drawn)는 자식을 props가 아니라 노드에 둔다.
+  const { type, props = {}, children } = node as { type: string; props?: Record<string, any>; children?: unknown }
+  const kids: unknown[] = [children ?? props.children ?? []].flat(Infinity)
+  if (type === 'Svg') return /%/.test(props.alt ?? '') ? '' : (props.alt ?? '')
+  if (type === 'Text') return kids.map(shownText).join('')
+  return kids.map(shownText).filter(Boolean).join(props.flexDirection === 'column' ? '\n' : ' ')
+}
+
+export const bandText = async (ui: { drawn: () => Promise<unknown> }): Promise<string> => shownText(await ui.drawn())

@@ -2,6 +2,7 @@ import { expect, mock, test } from 'claude-code/testing'
 
 import { LOGO_PX, barAlt, barSvg, displayWidth, formatLine, formatRows, lineFor, logoSvg, partsOf } from './format'
 import { providers } from './providers'
+import { bandText } from './shown'
 import { GEMINI_LOGO, OPENAI_LOGO } from './providers/logos'
 
 // 픽스처는 직접 만든 가짜 값이다.
@@ -433,6 +434,10 @@ async function band($: any, on: any, cases: [number, string][]) {
         const bars = (await ui.findAll({ type: 'Svg' })).filter((b: any) => /%/.test(b.props.alt))
         expect(bars.map((b: any) => b.props.alt)).toEqual(['18% used', '25% used'])
         expect((await ui.findAll({ type: 'Text' })).map((t: any) => t.text).join(' ')).toBe(want.replace(/(Codex|Gemini\(AG\)) /g, '').replace(/ [━╸─]+/g, '').replace(/ +/g, ' '))
+      } else if (surface === 'desktop') {
+        // 막대가 빠진 단계도 로고는 남고, 값은 칸별로 그린다.
+        expect((await ui.findAll({ type: 'Svg' })).map((b: any) => b.props.alt)).toEqual(want.startsWith('Cx') ? ['Cx', 'AG'] : ['Codex', 'Gemini(AG)'])
+        expect(await bandText(ui)).toBe(want.replace(/ +/g, ' '))
       } else {
         expect((await ui.find({ type: 'Text', text: /Cx|Codex/ }))?.text).toBe(want)
         expect(await ui.findAll({ type: 'Svg' })).toHaveLength(0)
@@ -682,12 +687,12 @@ test('the reset time stands after the percent with no mark, dim and without the 
 
   for (const [surface, columns] of [['desktop', 50], ['terminal', 85]] as const) {
     const ui = await mount(surface, columns)
-    expect((await ui.find({ type: 'Text', text: /Codex/ }))?.text).not.toContain('↻')
+    expect((await ui.findAll({ type: 'Text' })).some((t: any) => t.text.includes('↻'))).toBe(false)
     await ui.unmount()
   }
 })
 
-test('on the desktop a logo stands in for the source name where bars are drawn; elsewhere the name stays', async ($, on) => {
+test('on the desktop a logo stands in for the source name at every width; the terminal keeps the name', async ($, on) => {
   mock.clock(on, { now: NOW })
   const value = { codex: both(41, 4.75 * HOUR, 53, 21.2 * HOUR), gemini: both(0, 4.75 * HOUR, 0, 7 * DAY) }
   on('state.get', () => ({ value: { value, version: 0 } }))
@@ -709,12 +714,20 @@ test('on the desktop a logo stands in for the source name where bars are drawn; 
   expect((await wide.findAll({ type: 'Text' })).some((t: any) => /Codex|Gemini/.test(t.text))).toBe(false)
   await wide.unmount()
 
-  for (const [surface, columns] of [['desktop', 50], ['terminal', 85]] as const) {
-    const ui = await mount(surface, columns)
-    expect((await ui.find({ type: 'Text', text: /Codex/ }))?.text).toContain('Codex')
-    expect((await ui.findAll({ type: 'Svg' })).some((b: any) => b.props.alt === 'Codex')).toBe(false)
-    await ui.unmount()
+  // 사이드 패널을 열어 막대가 빠지는 폭에서도, 가장 좁은 폭에서도 로고가 남는다.
+  for (const columns of [50, 30, 10]) {
+    const narrow = await mount('desktop', columns)
+    expect((await narrow.findAll({ type: 'Svg' })).filter((b: any) => /%/.test(b.props.alt))).toHaveLength(0)
+    expect((await narrow.findAll({ type: 'Svg' })).filter((b: any) => ['Codex', 'Gemini(AG)', 'Cx', 'AG'].includes(b.props.alt))).toHaveLength(2)
+    expect((await narrow.findAll({ type: 'Text' })).some((t: any) => /Codex|Gemini|Cx|AG/.test(t.text))).toBe(false)
+    expect((await narrow.findAll({ type: 'Text' })).some((t: any) => t.text === '41%')).toBe(true)
+    await narrow.unmount()
   }
+
+  const terminal = await mount('terminal', 85)
+  expect((await terminal.find({ type: 'Text', text: /Codex/ }))?.text).toContain('Codex')
+  expect((await terminal.findAll({ type: 'Svg' })).some((b: any) => b.props.alt === 'Codex')).toBe(false)
+  await terminal.unmount()
 })
 
 test('a source with no logo keeps its name on the desktop', () => {
