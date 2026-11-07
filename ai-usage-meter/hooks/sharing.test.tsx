@@ -1,5 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 
+import { bandText } from './shown'
+
 // 픽스처는 직접 만든 가짜 값이다. 다른 세션은 저장소에 직접 써서 흉내 낸다.
 const NOW = Date.parse('2026-11-04T10:00:00Z')
 const MIN = 60_000
@@ -65,7 +67,7 @@ async function start($: any, clock: { settle: () => Promise<void> }) {
 
 async function line($: any) {
   const ui = await $.ui.mount(BAND)
-  const text: string | undefined = (await ui.find({ type: 'Text', text: /Cx/ }))?.text
+  const text: string | undefined = await bandText(ui)
   await ui.unmount()
   return text
 }
@@ -206,7 +208,7 @@ test('values an older version keeps writing are not read back', async ($, on) =>
 
 async function wide($: any) {
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal', props: { ...BAND.props, bodyColumns: 200 } })
-  const text: string | undefined = (await ui.find({ type: 'Text', text: /Codex|Gemini/ }))?.text
+  const text: string | undefined = await bandText(ui)
   await ui.unmount()
   return text
 }

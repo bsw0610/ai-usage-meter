@@ -37,7 +37,7 @@ A source whose program isn't on the session's `PATH` gets no row, and its row co
 
 | Part | Meaning |
 |---|---|
-| Logo or name | The source. Logos appear on the desktop where bars are drawn; the terminal and narrow bands use the name. |
+| Logo or name | The source. The desktop shows the logo at every width; the terminal uses the name. |
 | `5h` | The five-hour limit |
 | `Wk` | The weekly limit |
 | `Ar` | Antigravity's separate weekly limit for Gemini Argon |
