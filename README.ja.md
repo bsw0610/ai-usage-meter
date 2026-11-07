@@ -42,7 +42,7 @@ claude plugin install ai-usage-meter --marketplace bsw0610/ai-usage-meter --conf
 | `週` | 週間の上限 |
 | `Ar` | Gemini Argon 用に別枠で設けられた Antigravity の週間の上限 |
 | バーと `%` | 上限のうち使用した割合 |
-| `↻` | 上限がリセットされるまでの時間 |
+| `%` の後の時間 | 上限がリセットされるまでの時間 |
 | `—` | まだ値がありません。幅に余裕があれば `失敗`、`未インストール`、`古い値` も表示します。 |
 
 | 使用量 | 色 |
@@ -56,8 +56,8 @@ claude plugin install ai-usage-meter --marketplace bsw0610/ai-usage-meter --conf
 ターミナルでは、同じ内容を文字で表示します。
 
 ```
-Codex      5h ━━━━──────  41% ↻ 4h46m │ 週 ━━━━━━━━╸─  85% ↻ 21h13m
-Gemini(AG) 5h ━─────────  12% ↻ 2h31m │ 週 ━━━───────  30% ↻ 5日18時間 │ Ar 3% ↻ 5日18時間
+Codex      5h ━━━━──────  41% 4h46m │ 週 ━━━━━━━━╸─  85% 21h13m
+Gemini(AG) 5h ━─────────  12% 2h31m │ 週 ━━━───────  30% 5日18時間 │ Ar 3% 5日18時間
 ```
 
 ## 設定
