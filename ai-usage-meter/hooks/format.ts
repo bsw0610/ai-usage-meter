@@ -6,16 +6,21 @@ type Trouble = 'failed' | 'missing' | 'stale'
 
 type Entry = { label: string; short?: string; logo?: string; reading: Reading | null | undefined; trouble?: Trouble }
 
+// 한도의 경고 단계. 80%부터 주황, 다 쓰면 빨강.
+type Level = 'warning' | 'error'
+
 // 줄의 한 조각. 기본은 흐리게 그린다. isStrong은 사용률처럼 먼저 읽혀야 하는 값이다.
-export type Part = { text: string; color?: 'warning' | 'error'; isStrong?: boolean }
+// color는 테마 키(warning·error)나 막대의 채운 색(BAR_FILL)이다.
+export type Part = { text: string; color?: Level | typeof BAR_FILL; isStrong?: boolean }
 
 export type Bar = { percent: number }
 
 // 한도 하나의 표시. Svg를 그리는 표면은 칸별로, 터미널은 한 줄로 합쳐 그린다.
 // source: 소스 이름(줄의 첫 칸). logo: 이름 대신 그릴 수 있는 로고의 SVG 내용. label: 한도 이름. value: 사용률이나 줄표. reset: 리셋까지 남은 시간.
-export type Cell = { source?: string; logo?: string; label: string; bar?: Bar; value: string; reset?: string; color?: Part['color'] }
+export type Cell = { source?: string; logo?: string; label: string; bar?: Bar; value: string; reset?: string; color?: Level }
 
-type Step = { hasBar?: boolean; hasExtraBar?: boolean; detail?: 'exact' | 'hours'; isShort?: boolean; hasNoSlot?: boolean }
+// hasOneOther: 소스마다 줄을 둘 때, 첫 한도 말고는 가장 많이 쓴 한도 하나만 남긴다(가장 좁은 줄에서 끝 칸이 잘리지 않도록).
+type Step = { hasBar?: boolean; hasExtraBar?: boolean; detail?: 'exact' | 'hours'; isShort?: boolean; hasNoSlot?: boolean; hasOneOther?: boolean }
 
 // 넓은 순서. 앞에서부터 들어맞는 첫 단계를 쓰고, 어느 것도 안 맞으면 마지막 단계를 쓴다(끝은 Text가 자른다).
 // 따로 잡히는 한도(Argon)의 막대는 가장 먼저 내려놓는다. 분 단위가 더 중요하다.
@@ -27,6 +32,7 @@ const STEPS: Step[] = [
   { detail: 'hours' },
   { detail: 'hours', isShort: true },
   { isShort: true },
+  { isShort: true, hasOneOther: true },
 ]
 
 const DASH = '—'
@@ -111,10 +117,12 @@ function shortCount(n: number): string {
 
 // 터미널에는 Svg가 없어 선 문자로 그린다. 반 칸(5%) 단위가 한계다.
 // 조금이라도 썼으면 반 칸은 채우고, 다 쓰기 전에는 다 채우지 않는다.
-function barText({ percent }: Bar): string {
+// 데스크톱처럼 채운 부분과 바탕을 다른 색으로 칠하도록 둘을 나눠 돌려준다.
+function barText({ percent }: Bar): { used: string; left: string } {
   const halves = percent <= 0 ? 0 : percent >= 100 ? 2 * BAR_CELLS : Math.min(2 * BAR_CELLS - 1, Math.max(1, Math.round(percent / 5)))
   const whole = Math.floor(halves / 2)
-  return Array.from({ length: BAR_CELLS }, (_, i) => (i < whole ? '━' : i === whole && halves % 2 ? '╸' : '─')).join('')
+  const used = '━'.repeat(whole) + (halves % 2 ? '╸' : '')
+  return { used, left: '─'.repeat(BAR_CELLS - whole - (halves % 2)) }
 }
 
 export const BAR_WIDTH_PX = 80
@@ -127,7 +135,7 @@ const BAR_TRACK = 'rgba(140,140,140,0.3)'
 const BAR_INSET_PX = 2
 
 // 값 그대로의 위치에 그리는 선.
-export function barSvg({ percent }: Bar, color?: Part['color']): string {
+export function barSvg({ percent }: Bar, color?: Level): string {
   const mid = BAR_HEIGHT_PX / 2
   const at = (ratio: number) => (BAR_INSET_PX + Math.min(1, Math.max(0, ratio)) * (BAR_WIDTH_PX - 2 * BAR_INSET_PX)).toFixed(2)
   const line = (x1: string, x2: string, stroke: string) =>
@@ -192,7 +200,14 @@ function cellsOf(e: Entry, now: number, step: Step, isStacked: boolean, text: St
     ...(r.secondary ? [{ name: text.weeklyShort, limit: r.secondary, step }] : []),
     ...(r.extra ? [{ name: r.extra.short, limit: r.extra, step: { ...step, hasBar: !!step.hasExtraBar, hasNoSlot: true } }] : []),
   ]
-  if (isStacked) return [primary, ...others.map(o => ({ label: o.name, ...limitCell(o.limit, now, o.step, text) }))]
+  const cellOf = (o: (typeof others)[number]): Cell => ({ label: o.name, ...limitCell(o.limit, now, o.step, text) })
+  if (isStacked && !step.hasOneOther) return [primary, ...others.map(cellOf)]
+  if (isStacked) {
+    // 더 많이 쓴 쪽을 남긴다. 같으면 앞의 것(주간)이다.
+    let most: (typeof others)[number] | undefined
+    for (const o of others) if (!most || isMoreUrgent(o.limit, most.limit, now)) most = o
+    return most ? [primary, cellOf(most)] : [primary]
+  }
   let urgent: (typeof others)[number] | undefined
   for (const o of others) if (isMoreUrgent(o.limit, urgent?.limit ?? r, now)) urgent = o
   if (!urgent) return [primary]
@@ -233,7 +248,12 @@ export function partsOf(cells: Cell[], widths: ColumnWidths = columnWidths([cell
     const isLast = j === cells.length - 1
     const resetWidth = widths.reset[j] ?? 0
     add({ text: `${j ? ` ${SEPARATOR} ` : ''}${named(c.source ?? '', widths.source[j])}${named(c.label, widths.label[j])}` })
-    if (c.bar) add({ text: `${barText(c.bar)} `, ...(c.color ? { color: c.color } : {}) })
+    // 막대는 데스크톱과 같이 채운 부분만 파랑(경고면 그 색)으로, 바탕은 흐리게 그린다.
+    if (c.bar) {
+      const { used, left } = barText(c.bar)
+      if (used) add({ text: used, color: c.color ?? BAR_FILL })
+      add({ text: `${left} ` })
+    }
     add({ text: isLast && !c.reset ? c.value : padTo(c.value, widths.value[j]), isStrong: true, ...(c.color ? { color: c.color } : {}) })
     // 리셋은 한도 색을 따르지 않고 늘 흐리게 그린다.
     if (c.reset) add({ text: ` ${isLast ? c.reset : padTo(c.reset, resetWidth)}` })

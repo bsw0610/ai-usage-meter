@@ -103,7 +103,7 @@ test('a fourth provider narrows with the others', () => {
 })
 
 const one = (reading: any, columns?: number) => formatLine([{ label: 'A', short: 'a', reading }], NOW, columns)
-const colorOf = (reading: any) => partsOf(formatRows([{ label: 'A', reading }], NOW)[0]!).find(p => p.color)?.color
+const colorOf = (reading: any) => partsOf(formatRows([{ label: 'A', reading }], NOW)[0]!).find(p => p.isStrong)?.color
 
 test('the bar keeps ten cells', () => {
   expect(one(percent(10, 4 * HOUR))).toBe('A 5h ━─────────  10% 4h')
@@ -144,6 +144,21 @@ test('the bar is only the used line, and says what it shows', () => {
   expect(barAlt({ percent: 51.4 })).toBe('51% used')
 })
 
+test('on the terminal the used part of the bar is blue like the desktop, and the rest stays dim', () => {
+  const parts = (p: number) => partsOf(formatRows([{ label: 'A', reading: percent(p, HOUR) }], NOW)[0]!)
+  expect(parts(25)).toEqual([
+    { text: 'A 5h ' },
+    { text: '━━╸', color: '#2c84db' },
+    { text: '─────── ' },
+    { text: ' 25%', isStrong: true },
+    { text: ' 1h' },
+  ])
+  expect(parts(85).find(p => p.text.startsWith('━'))?.color).toBe('warning')
+  expect(parts(85).find(p => p.text.startsWith('─'))?.color).toBeUndefined() // 바탕은 경고여도 흐리다
+  expect(parts(0).some(p => p.color)).toBe(false) // 쓰지 않았으면 칠할 곳이 없다
+  expect(parts(100).filter(p => p.color).map(p => p.text)).toEqual(['━━━━━━━━━━', '100%'])
+})
+
 test('a window used up shows its percent in the error color', () => {
   expect(one(percent(100, 4 * HOUR))).toBe('A 5h ━━━━━━━━━━ 100% 4h')
   expect(colorOf(percent(100, HOUR))).toBe('error')
@@ -171,7 +186,7 @@ test('only the limit used up is colored, and the line stays whole, on both surfa
     })
     const colored = (await ui.findAll({ type: 'Text' })).filter(t => t.props.color)
     if (surface === 'terminal') {
-      expect(colored.map(t => [t.text, t.props.color])).toEqual([['━━━━━━━━━━ ', 'error'], ['100%', 'error']])
+      expect(colored.map(t => [t.text, t.props.color])).toEqual([['━━━━━━━━━━', 'error'], ['100%', 'error'], ['━', '#2c84db']])
       expect((await ui.find({ type: 'Text', text: /Gemini/ }))?.text).toBe('Codex 5h ━━━━━━━━━━ 100% 4h │ Gemini(AG) 5h ━─────────  10% 4h')
     } else {
       expect(colored.map(t => [t.text, t.props.color])).toEqual([['100%', 'error']])
@@ -469,7 +484,9 @@ test('a third limit joins its source row, and the rows above keep their columns'
     'Codex      5h ━━━━━━━━──  82% 3h7m │ Wk ━━━━╸─────  46% 1d 21h',
     'Gemini(AG) 5h ━━╸───────  25% 3h   │ Wk ━─────────  10% 5d     │ Ar ╸───────── 3% 6d',
   ])
-  expect(formatLine(withArgon, NOW, 10).split('\n')).toEqual(['Cx 82% │ Wk 46%', 'AG 25% │ Wk 10% │ Ar 3%'])
+  expect(formatLine(withArgon, NOW, 23).split('\n')).toEqual(['Cx 82% │ Wk 46%', 'AG 25% │ Wk 10% │ Ar 3%'])
+  // 그보다 좁으면 셋째 칸에는 더 많이 쓴 한도 하나만 남는다(여기서는 주간 10%가 Argon 3%보다 많다).
+  expect(formatLine(withArgon, NOW, 10).split('\n')).toEqual(['Cx 82% │ Wk 46%', 'AG 25% │ Wk 10%'])
 })
 
 test('at the width of a real window, every language keeps the third limit and the minutes', () => {
@@ -581,6 +598,14 @@ test('each limit is a named group, and the groups line up across rows', () => {
     'Codex      5h ━━━━──────  41% 4h45m │ Wk ━━━━━╸────  53% 21h12m',
     'Gemini(AG) 5h ──────────   0% 4h45m │ Wk ──────────   0% 7d     │ Ar ╸───────── 3% 6d',
   ])
+})
+
+test('on a very narrow band each row keeps its first limit and the one used most, so Argon is not cut off', () => {
+  // 셋 다 두면 가장 짧게 써도 22칸이라, 그보다 좁으면 끝의 Argon이 잘렸다.
+  expect(formatLine(realRows, NOW, 21).split('\n')).toEqual(['Cx 41% │ Wk 53%', 'AG 0%  │ Ar 3%'])
+  // 주간을 더 썼으면 주간이 남는다.
+  const weeklyFirst = [realRows[0]!, { ...realRows[1]!, reading: { ...both(0, 4.75 * HOUR, 60, 7 * DAY), extra: argon(3, 6 * DAY) } }]
+  expect(formatLine(weeklyFirst, NOW, 21).split('\n')).toEqual(['Cx 41% │ Wk 53%', 'AG 0%  │ Wk 60%'])
 })
 
 test('a weekly limit alone sits in the first group under its own name', () => {
