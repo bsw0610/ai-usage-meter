@@ -145,7 +145,10 @@ export async function refreshDue($: EngineInterface, list: Provider[], isForced 
         const reading = await p.read(io)
         if (!reading) throw new ReadFailure('no value')
         // observedAt은 읽어 온 시각이다. 오래된 로그의 값도 지금 읽었으면 수명이 새로 시작한다.
-        await put($, p.id, { ...reading, observedAt: now })
+        // 로그처럼 더 이른 시각에 찍힌 값이면 그 시각을 measuredAt으로 남긴다(시각을 모르는 줄은 0이라 남기지 않는다).
+        // 선택 필드라 저장소 키는 올리지 않는다. 옛 코드가 덮어써 빠져도 observedAt으로 읽힐 뿐이다.
+        const isEarlier = reading.kind === 'percent' && reading.observedAt > 0 && reading.observedAt < now
+        await put($, p.id, { ...reading, observedAt: now, ...(isEarlier ? { measuredAt: reading.observedAt } : {}) })
         await markAttempts($, { [p.id]: { at: now, isOk: true } })
       } catch (e) {
         const error = (e instanceof Error ? e.message : String(e)).slice(0, MAX_ERROR_CHARS)

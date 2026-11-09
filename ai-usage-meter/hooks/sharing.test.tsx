@@ -176,8 +176,8 @@ test('an attempt stored as a bare number by an older version still counts', asyn
   expect(calls.agy).toBe(0)
 })
 
-test('an old value read from the log just now is shown, not treated as expired', async ($, on) => {
-  const { clock, mode, log } = world(on)
+test('an old value read from the log just now is shown, not treated as expired, and keeps the time of its log line', async ($, on) => {
+  const { clock, mode, log, store } = world(on)
   mode.codex = 'fail'
   log.text =
     JSON.stringify({
@@ -190,6 +190,26 @@ test('an old value read from the log just now is shown, not treated as expired',
     }) + '\n'
   await start($, clock)
   expect(await line($)).toBe('Cx 22% │ AG 25%')
+  // 수명은 읽어 온 시각부터 세고, 값이 실제로 찍힌 시각(로그 줄의 시각)은 따로 남는다.
+  const codex = (store['readings-v5'] as any).codex
+  expect(codex.observedAt).toBe(NOW)
+  expect(codex.measuredAt).toBe(NOW - 120 * MIN)
+  // 바로 물어 온 값은 따로 남길 시각이 없다.
+  expect((store['readings-v5'] as any).gemini.measuredAt).toBeUndefined()
+})
+
+test('a log line with no time leaves no measured time', async ($, on) => {
+  const { clock, mode, log, store } = world(on)
+  mode.codex = 'fail'
+  log.text =
+    JSON.stringify({
+      type: 'event_msg',
+      payload: { type: 'token_count', rate_limits: { limit_id: 'codex', primary: { used_percent: 22, window_minutes: 300, resets_at: SEC + 3600 } } },
+    }) + '\n'
+  await start($, clock)
+  const codex = (store['readings-v5'] as any).codex
+  expect(codex.percent).toBe(22)
+  expect(codex.measuredAt).toBeUndefined()
 })
 
 test('values an older version keeps writing are not read back', async ($, on) => {

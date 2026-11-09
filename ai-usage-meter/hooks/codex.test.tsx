@@ -156,9 +156,9 @@ test('only a 7-day window falls back to it', async ($, on) => {
   await ui.unmount()
 })
 
-test('a window whose reset time has passed is shown as 0%', async ($, on) => {
+test('a window whose reset time has passed is a dash, not 0%, until a newer value comes', async ($, on) => {
   const { clock } = world(on, one(F, tokenCount(limits(win(80, 300, -60), null))))
-  expect(await shown($, clock)).toBe('Cx 0%')
+  expect(await shown($, clock)).toBe('Cx —')
 })
 
 test('a file over 4 MiB is read through tail, and yesterday is checked too', async ($, on) => {

@@ -43,7 +43,7 @@ A source whose program isn't on the session's `PATH` gets no row, and its row co
 | `Ar` | Antigravity's separate weekly limit for Gemini Argon |
 | Bar and `%` | How much of the limit you have used |
 | Time after `%` | Time until the limit resets |
-| `—` | No value yet. With enough room, it also says `failed`, `not installed` or `stale`. |
+| `—` | No value yet. With enough room, it also says `failed`, `not installed` or `stale`. Next to a limit, it means the limit has reset and the new usage is not known until the next check. |
 | `↻` at the right end of the first row | Look up every source now. It spins until the lookups finish. |
 
 | Used | Color |

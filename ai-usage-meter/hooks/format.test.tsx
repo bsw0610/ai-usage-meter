@@ -70,9 +70,21 @@ test('with room, a day or more reads in days and hours; a narrow line stays shor
   expect(left(44 * HOUR, displayWidth('A 5h ━━╸──────  30% 44h'))).toBe('A 5h ━━╸──────  30% 44h')
 })
 
-test('a passed reset shows 0% and no reset', () => {
-  expect(formatLine([{ label: 'A', reading: percent(80, -HOUR) }], NOW)).toBe('A 5h ─────────   0%')
-  expect(formatLine([{ label: 'A', reading: percent(80, -HOUR) }], NOW)).toBe('A 5h ─────────   0%')
+test('a passed reset shows a dash until the next check, not 0%, from the very moment of the reset', () => {
+  for (const left of [-HOUR, -1, 0]) expect(formatLine([{ label: 'A', reading: percent(80, left) }], NOW)).toBe('A 5h ─────────    —')
+  expect(formatLine([{ label: 'A', reading: percent(80, 60_000) }], NOW)).toBe('A 5h ━━━━━━━──  80% 1m')
+  // 막대는 바탕만 남고 0%라고 읽히지 않는다. 색도 없다.
+  const [cell] = formatRows([{ label: 'A', reading: percent(80, -HOUR) }], NOW)[0]!
+  expect(cell).toMatchObject({ bar: { percent: 0, isPending: true }, value: '   —' })
+  expect(cell!.color).toBeUndefined()
+  expect(cell!.reset).toBeUndefined()
+  expect(barAlt(cell!.bar!)).toBe('waiting for the next check')
+  expect(barAlt(cell!.bar!, 'ja')).toBe('次の確認待ち')
+  expect(barAlt(cell!.bar!, 'ko')).toBe('다음 확인 대기')
+  // 한 칸만 리셋이 지나도 막대는 모든 칸에 있다.
+  const rows = formatRows([{ label: 'A', reading: { ...both(25, 3 * HOUR, 10, -HOUR), extra: { label: 'Argon', short: 'Ar', percent: 3, resetsAt: NOW + DAY } } }], NOW)
+  expect(rows[0]!.map(c => !!c.bar)).toEqual([true, true, true])
+  expect(rows[0]!.map(c => c.value.trim())).toEqual(['25%', '—', '3%'])
 })
 
 test('counts read short, and only the narrowest step drops the unit', () => {
