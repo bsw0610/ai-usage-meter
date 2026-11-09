@@ -4,7 +4,7 @@ English | [日本語](README.ja.md)
 
 See your Codex and Antigravity usage limits while you work in Claude Code. This mod adds a small band above the prompt with how much of each limit you have used and when it resets.
 
-![The band on the Claude Code desktop app in dark mode, with one row for ChatGPT Codex and one for Gemini in Antigravity](docs/band.png)
+![The band on the Claude Code desktop app in dark mode, with one row for ChatGPT Codex and one for Gemini in Antigravity, and the refresh button at the right end of the first row](docs/band.png)
 
 *Illustration with example values, drawn from the mod's own graphics in dark mode.*
 
