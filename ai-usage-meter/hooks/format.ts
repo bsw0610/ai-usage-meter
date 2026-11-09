@@ -40,7 +40,7 @@ const RED_FROM_PERCENT = 100 // 다 썼을 때
 const SEPARATOR = '│'
 const FIVE_HOUR_NAME = '5h'
 const PERCENT_SLOT = 4 // "100%"까지 자릿수가 바뀌어도 뒤의 값이 움직이지 않는다
-const BAR_CELLS = 10
+const BAR_CELLS = 9 // 막대 길이. 0.15.2에서 사용자 요청으로 10칸에서 10% 줄였다(데스크톱 80px → 72px).
 
 export type Lang = 'ko' | 'en' | 'ja'
 
@@ -122,17 +122,20 @@ function shortCount(n: number): string {
   return k < 10 ? `${k.toFixed(1)}k` : `${Math.round(k)}k`
 }
 
-// 터미널에는 Svg가 없어 선 문자로 그린다. 반 칸(5%) 단위가 한계다.
+// 터미널에는 Svg가 없어 선 문자로 그린다. 반 칸(9칸이면 약 5.6%) 단위가 한계다.
 // 조금이라도 썼으면 반 칸은 채우고, 다 쓰기 전에는 다 채우지 않는다.
 // 데스크톱처럼 채운 부분과 바탕을 다른 색으로 칠하도록 둘을 나눠 돌려준다.
 function barText({ percent }: Bar): { used: string; left: string } {
-  const halves = percent <= 0 ? 0 : percent >= 100 ? 2 * BAR_CELLS : Math.min(2 * BAR_CELLS - 1, Math.max(1, Math.round(percent / 5)))
+  const halves =
+    percent <= 0 ? 0
+    : percent >= 100 ? 2 * BAR_CELLS
+    : Math.min(2 * BAR_CELLS - 1, Math.max(1, Math.round((percent / 100) * 2 * BAR_CELLS)))
   const whole = Math.floor(halves / 2)
   const used = '━'.repeat(whole) + (halves % 2 ? '╸' : '')
   return { used, left: '─'.repeat(BAR_CELLS - whole - (halves % 2)) }
 }
 
-export const BAR_WIDTH_PX = 80
+export const BAR_WIDTH_PX = 8 * BAR_CELLS // 한 칸 8px
 export const BAR_HEIGHT_PX = 12
 
 // Svg는 이미지로 그려져 테마 색을 받지 못하므로, 밝은 화면과 어두운 화면 모두에서 보이는 중간 색을 쓴다.
@@ -153,7 +156,7 @@ export function barSvg({ percent }: Bar, color?: Level): string {
 
 export const LOGO_PX = 16
 
-// 데스크톱이 이름 대신 그리는 로고가 차지하는 칸 수. 막대가 10칸을 80px로 그리므로 한 칸은 8px로 보고, 16px 로고는 2칸이다.
+// 데스크톱이 이름 대신 그리는 로고가 차지하는 칸 수. 막대가 한 칸을 8px로 그리므로, 16px 로고는 2칸이다.
 const LOGO_CELLS = Math.ceil(LOGO_PX / (BAR_WIDTH_PX / BAR_CELLS))
 
 // 로고 내용(24×24)을 그림으로. 색은 로고가 정한다.

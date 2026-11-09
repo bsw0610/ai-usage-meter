@@ -57,8 +57,8 @@ The band gives up detail as the window narrows: first the minutes, then the bars
 In a terminal, the same information is drawn with text:
 
 ```
-Codex      5h ━━━━──────  41% 4h46m │ Wk ━━━━━━━━╸─  85% 21h13m                           ↻
-Gemini(AG) 5h ━─────────  12% 2h31m │ Wk ━━━───────  30% 5d 18h │ Ar ╸───────── 3% 5d 18h
+Codex      5h ━━━╸─────  41% 4h46m │ Wk ━━━━━━━╸─  85% 21h13m                          ↻
+Gemini(AG) 5h ━────────  12% 2h31m │ Wk ━━╸──────  30% 5d 18h │ Ar ╸──────── 3% 5d 18h
 ```
 
 ## Settings
