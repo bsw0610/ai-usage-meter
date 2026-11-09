@@ -13,7 +13,8 @@ type Level = 'warning' | 'error'
 // color는 테마 키(warning·error)나 막대의 채운 색(BAR_FILL)이다.
 export type Part = { text: string; color?: Level | typeof BAR_FILL; isStrong?: boolean }
 
-export type Bar = { percent: number }
+// isPending: 리셋이 지나 지금 창의 값을 아직 모른다. 바탕만 그리고, 0%라고 읽히지 않게 한다.
+export type Bar = { percent: number; isPending?: true }
 
 // 한도 하나의 표시. Svg를 그리는 표면은 칸별로, 터미널은 한 줄로 합쳐 그린다.
 // source: 소스 이름(줄의 첫 칸). logo: 이름 대신 그릴 수 있는 로고의 SVG 내용. label: 한도 이름. value: 사용률이나 줄표. reset: 리셋까지 남은 시간.
@@ -56,6 +57,7 @@ type Strings = {
   used: (percent: number) => string
   refresh: string
   refreshing: string
+  pending: string
 }
 
 const STRINGS: Record<Lang, Strings> = {
@@ -66,6 +68,7 @@ const STRINGS: Record<Lang, Strings> = {
     used: percent => `${percent}% 사용`,
     refresh: '새로 고침',
     refreshing: '새로 고치는 중',
+    pending: '다음 확인 대기',
   },
   en: {
     trouble: { failed: 'failed', missing: 'not installed', stale: 'stale' },
@@ -74,6 +77,7 @@ const STRINGS: Record<Lang, Strings> = {
     used: percent => `${percent}% used`,
     refresh: 'Refresh',
     refreshing: 'Refreshing',
+    pending: 'waiting for the next check',
   },
   ja: {
     trouble: { failed: '失敗', missing: '未インストール', stale: '古い値' },
@@ -82,6 +86,7 @@ const STRINGS: Record<Lang, Strings> = {
     used: percent => `${percent}%使用`,
     refresh: '更新',
     refreshing: '更新中',
+    pending: '次の確認待ち',
   },
 }
 
@@ -163,7 +168,8 @@ const LOGO_CELLS = Math.ceil(LOGO_PX / (BAR_WIDTH_PX / BAR_CELLS))
 export const logoSvg = (content: string): string =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${LOGO_PX}" height="${LOGO_PX}" viewBox="0 0 24 24">${content}</svg>`
 
-export const barAlt = ({ percent }: Bar, lang: Lang = DEFAULT_LANG): string => STRINGS[lang].used(Math.round(percent))
+export const barAlt = ({ percent, isPending }: Bar, lang: Lang = DEFAULT_LANG): string =>
+  isPending ? STRINGS[lang].pending : STRINGS[lang].used(Math.round(percent))
 
 export const SPIN_ICON_PX = 14
 const SPIN_ICON_COLOR = 'rgba(140,140,140,0.95)' // 밝은 화면과 어두운 화면 모두에서 흐린 글자처럼 보이는 색
@@ -189,8 +195,9 @@ export const refreshAlt = (isSpinning: boolean, lang: Lang = DEFAULT_LANG): stri
 function limitCell(r: PercentLimit, now: number, step: Step, text: Strings): Omit<Cell, 'label' | 'source'> {
   const slot = (value: string) => (step.isShort || step.hasNoSlot ? value : value.padStart(PERCENT_SLOT))
   const left = r.resetsAt === undefined ? undefined : r.resetsAt - now
-  // 리셋 시각이 지난 창은 새 창이 열린 것이므로 0%.
-  if (left !== undefined && left <= 0) return { ...(step.hasBar ? { bar: { percent: 0 } } : {}), value: slot('0%') }
+  // 리셋 시각이 지난 값은 끝난 창의 것이다. 새 창의 사용량은 다음 조회가 알려 줄 때까지 모르므로, 0%라고 단정하지 않고 줄표로 그린다.
+  // 막대는 바탕만 남긴다. 빼면 데스크톱에서 뒤의 칸이 밀리고, 모든 칸에 막대가 있거나 없어야 한다.
+  if (left !== undefined && left <= 0) return { ...(step.hasBar ? { bar: { percent: 0, isPending: true as const } } : {}), value: slot(DASH) }
 
   const shown = Math.round(r.percent)
   const color = shown >= RED_FROM_PERCENT ? ('error' as const) : shown >= ORANGE_FROM_PERCENT ? ('warning' as const) : undefined
@@ -207,7 +214,7 @@ function limitCell(r: PercentLimit, now: number, step: Step, text: Strings): Omi
   }
 }
 
-// 더 많이 쓴 한도가 더 급하다. 리셋이 지난 창은 새로 시작했으므로 0%로 친다.
+// 더 많이 쓴 한도가 더 급하다. 리셋이 지난 창은 값을 모르므로 급하지 않은 것(0%)으로 친다.
 function isMoreUrgent(a: PercentLimit, b: PercentLimit, now: number): boolean {
   const used = (r: PercentLimit) => (r.resetsAt !== undefined && r.resetsAt <= now ? 0 : r.percent)
   return used(a) > used(b)
