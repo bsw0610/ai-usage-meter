@@ -490,35 +490,40 @@ test('a third limit joins its source row, and the rows above keep their columns'
   expect(formatLine(withArgon, NOW, 10).split('\n')).toEqual(['Cx 82% │ Wk 46%', 'AG 25% │ Wk 10%'])
 })
 
-test('at the width of a real window, every language keeps the third limit and the minutes', () => {
+test('at the width of a real window, every language keeps every bar, and English keeps the minutes too', () => {
   const rows = (lang: 'ko' | 'en' | 'ja') => formatLine(withArgon, NOW, 85, Infinity, lang).split('\n')
   expect(rows('en')).toEqual([
     'Codex      5h ━━━━━━━━──  82% 3h7m │ Wk ━━━━╸─────  46% 1d 21h',
     'Gemini(AG) 5h ━━╸───────  25% 3h   │ Wk ━─────────  10% 5d     │ Ar ╸───────── 3% 6d',
   ])
-  // 일본어와 한국어는 날짜가 길어 같은 폭에 Argon 막대가 들어가지 않는다. 막대보다 분 단위를 남긴다.
+  // 일본어와 한국어는 날짜가 길어 같은 폭에 분 단위가 들어가지 않는다. 그래도 Argon 막대만 빠지지 않고 셋 다 남는다.
   expect(rows('ko')).toEqual([
-    'Codex      5h ━━━━━━━━──  82% 3h7m │ 주 ━━━━╸─────  46% 1일 21시간',
-    'Gemini(AG) 5h ━━╸───────  25% 3h   │ 주 ━─────────  10% 5일        │ Ar 3% 6일',
+    'Codex      5h ━━━━━━━━──  82% 3h │ 주 ━━━━╸─────  46% 45h',
+    'Gemini(AG) 5h ━━╸───────  25% 3h │ 주 ━─────────  10% 5d  │ Ar ╸───────── 3% 6d',
   ])
   expect(rows('ja')).toEqual([
-    'Codex      5h ━━━━━━━━──  82% 3h7m │ 週 ━━━━╸─────  46% 1日21時間',
-    'Gemini(AG) 5h ━━╸───────  25% 3h   │ 週 ━─────────  10% 5日       │ Ar 3% 6日',
+    'Codex      5h ━━━━━━━━──  82% 3h │ 週 ━━━━╸─────  46% 45h',
+    'Gemini(AG) 5h ━━╸───────  25% 3h │ 週 ━─────────  10% 5d  │ Ar ╸───────── 3% 6d',
   ])
   for (const lang of ['en', 'ja', 'ko'] as const) expect(rows(lang).every(r => displayWidth(r) <= 85)).toBe(true)
 })
 
-test('a third limit draws its bar only with room to spare, and gives it up before the minutes', () => {
-  const third = (w: number) => formatRows(withArgon, NOW, w)[1]![2]!
-  for (const w of [Infinity, 120, 85, 84]) expect(third(w).bar).toEqual({ percent: 3 })
-  for (const w of [83, 60]) {
-    expect(third(w).label).toBe('Ar')
-    expect(third(w).bar).toBeUndefined()
+test('a third limit keeps its bar as long as the other limits do, and all the bars go together', () => {
+  // Argon 막대만 먼저 사라지지 않는다. 어느 폭에서든 막대는 모든 칸에 있거나 어느 칸에도 없다.
+  for (const lang of ['en', 'ja', 'ko'] as const) {
+    for (const hasLogos of [false, true]) {
+      for (let w = 8; w <= 120; w++) {
+        const bars = formatRows(withArgon, NOW, w, Infinity, lang, hasLogos).flat().map(c => !!c.bar)
+        expect(bars.every(b => b === bars[0])).toBe(true)
+      }
+    }
   }
-  expect(formatLine(withArgon, NOW, 83).split('\n')).toEqual([
-    'Codex      5h ━━━━━━━━──  82% 3h7m │ Wk ━━━━╸─────  46% 1d 21h',
-    'Gemini(AG) 5h ━━╸───────  25% 3h   │ Wk ━─────────  10% 5d     │ Ar 3% 6d',
-  ])
+  const third = (w: number) => formatRows(withArgon, NOW, w)[1]![2]!
+  for (const w of [Infinity, 120, 85, 84, 83, 79]) expect(third(w).bar).toEqual({ percent: 3 })
+  for (const w of [78, 60]) {
+    expect(third(w).label).toBe('Ar')
+    expect(formatRows(withArgon, NOW, w).flat().some(c => c.bar)).toBe(false)
+  }
 })
 
 test('room kept at the end of the first row for the refresh button costs the Argon row nothing', () => {
@@ -531,10 +536,10 @@ test('room kept at the end of the first row for the refresh button costs the Arg
   expect(formatRows(alone, NOW, width + 2, Infinity, 'en', false, 2)[0]![1]!.bar).toEqual({ percent: 3 })
 })
 
-test('with too little room for the minutes, the rows fall back to whole hours', () => {
-  expect(formatLine(withArgon, NOW, 72).split('\n')).toEqual([
+test('with too little room for the minutes, the rows fall back to whole hours and keep every bar', () => {
+  expect(formatLine(withArgon, NOW, 83).split('\n')).toEqual([
     'Codex      5h ━━━━━━━━──  82% 3h │ Wk ━━━━╸─────  46% 45h',
-    'Gemini(AG) 5h ━━╸───────  25% 3h │ Wk ━─────────  10% 5d  │ Ar 3% 6d',
+    'Gemini(AG) 5h ━━╸───────  25% 3h │ Wk ━─────────  10% 5d  │ Ar ╸───────── 3% 6d',
   ])
 })
 
@@ -625,9 +630,9 @@ test('a weekly limit alone sits in the first group under its own name', () => {
 })
 
 test('the shrinking order keeps the percent and the reset longest', () => {
-  expect(formatLine(realRows, NOW, 73).split('\n')).toEqual([
+  expect(formatLine(realRows, NOW, 80).split('\n')).toEqual([
     'Codex      5h ━━━━──────  41% 5h │ Wk ━━━━━╸────  53% 21h',
-    'Gemini(AG) 5h ──────────   0% 5h │ Wk ──────────   0% 7d  │ Ar 3% 6d',
+    'Gemini(AG) 5h ──────────   0% 5h │ Wk ──────────   0% 7d  │ Ar ╸───────── 3% 6d',
   ])
   expect(formatLine(realRows, NOW, 60).split('\n')).toEqual([
     'Codex      5h  41% 4h45m │ Wk  53% 21h12m',
@@ -693,15 +698,21 @@ test('on the desktop the values keep the app font with digits of one width, and 
   await ui.unmount()
 })
 
-test('the longest day format keeps the minutes at 85 in English and at 88 in the others', () => {
+test('the longest day format keeps every bar and the minutes at 85 on the desktop, and at 89 to 93 on the terminal', () => {
   const list = [realRows[0]!, { ...realRows[1]!, reading: { ...both(0, 4.75 * HOUR, 0, 7 * DAY), extra: argon(3, 5.75 * DAY) } }]
-  const rows = (lang: 'en' | 'ja' | 'ko', columns: number) => formatLine(list, NOW, columns, Infinity, lang).split('\n')
-  expect(rows('en', 85)[0]).toContain('4h45m')
-  for (const lang of ['ja', 'ko'] as const) {
-    expect(rows(lang, 85)[0]).toContain('5h')
-    expect(rows(lang, 88)[0]).toContain('4h45m')
+  const full = (rows: ReturnType<typeof formatRows>) => rows[0]![0]!.reset === '4h45m' && rows.flat().every(c => c.bar)
+  const terminal = (lang: 'en' | 'ja' | 'ko', columns: number) => formatRows(list, NOW, columns, Infinity, lang)
+  for (const [lang, columns] of [['en', 89], ['ja', 92], ['ko', 93]] as const) {
+    expect(full(terminal(lang, columns))).toBe(true)
+    expect(full(terminal(lang, columns - 1))).toBe(false)
+    // 데스크톱은 로고가 이름보다 좁아, 보통 폭(85)에서 어느 언어든 모두 남는다.
+    expect(full(formatRows(list.map(e => ({ ...e, logo: '<path/>' })), NOW, 85, Infinity, lang, true))).toBe(true)
   }
-  for (const lang of ['en', 'ja', 'ko'] as const) expect(rows(lang, 85).every(r => displayWidth(r) <= 85)).toBe(true)
+  for (const lang of ['en', 'ja', 'ko'] as const) {
+    const rows = formatLine(list, NOW, 85, Infinity, lang).split('\n')
+    expect(rows[0]).toContain('5h')
+    expect(rows.every(r => displayWidth(r) <= 85)).toBe(true)
+  }
 })
 
 test('the reset time stands after the percent with no mark, dim and without the color of its limit', async ($, on) => {
@@ -781,8 +792,8 @@ const terminalRows = (w: number) => formatRows(logoRows, NOW, w)
 test('on the desktop a logo counts as two cells, so each detail stays eight columns narrower than on the terminal', () => {
   for (let w = 46; w <= 100; w++) expect(desktopRows(w - 8)).toEqual(terminalRows(w))
   // 사이드 패널을 연 폭: 터미널 기준이면 막대가 빠지지만, 데스크톱은 막대를 지킨다.
-  expect(terminalRows(60).flat().some(c => c.bar)).toBe(false)
-  expect(desktopRows(60).flat().filter(c => c.bar)).toHaveLength(4)
+  expect(terminalRows(72).flat().some(c => c.bar)).toBe(false)
+  expect(desktopRows(72).flat().filter(c => c.bar)).toHaveLength(5)
   // 막대가 빠진 뒤에도 분 단위와 이름 칸(로고 자리)을 더 오래 지킨다.
   expect(terminalRows(44)[0]![0]).toMatchObject({ source: 'Cx', reset: '5h' })
   expect(desktopRows(44)[0]![0]).toMatchObject({ source: 'Codex', label: '5h', reset: '4h45m' })

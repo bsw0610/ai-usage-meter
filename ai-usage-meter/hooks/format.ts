@@ -20,12 +20,11 @@ export type Bar = { percent: number }
 export type Cell = { source?: string; logo?: string; label: string; bar?: Bar; value: string; reset?: string; color?: Level }
 
 // hasOneOther: 소스마다 줄을 둘 때, 첫 한도 말고는 가장 많이 쓴 한도 하나만 남긴다(가장 좁은 줄에서 끝 칸이 잘리지 않도록).
-type Step = { hasBar?: boolean; hasExtraBar?: boolean; detail?: 'exact' | 'hours'; isShort?: boolean; hasNoSlot?: boolean; hasOneOther?: boolean }
+type Step = { hasBar?: boolean; detail?: 'exact' | 'hours'; isShort?: boolean; hasNoSlot?: boolean; hasOneOther?: boolean }
 
 // 넓은 순서. 앞에서부터 들어맞는 첫 단계를 쓰고, 어느 것도 안 맞으면 마지막 단계를 쓴다(끝은 Text가 자른다).
-// 따로 잡히는 한도(Argon)의 막대는 가장 먼저 내려놓는다. 분 단위가 더 중요하다.
+// 막대는 모든 한도(Argon 포함)에 함께 그리고 함께 내려놓는다. 한 칸의 막대만 먼저 사라지지 않게 한다.
 const STEPS: Step[] = [
-  { hasBar: true, hasExtraBar: true, detail: 'exact' },
   { hasBar: true, detail: 'exact' },
   { hasBar: true, detail: 'hours' },
   { detail: 'exact' },
@@ -224,10 +223,10 @@ function cellsOf(e: Entry, now: number, step: Step, isStacked: boolean, text: St
   // 가장 좁을 때는 첫 칸이 5시간 한도라는 것을 이름 없이 둔다.
   const firstName = r.isWeekly ? text.weeklyShort : step.isShort ? '' : FIVE_HOUR_NAME
   const primary = { ...named, label: firstName, ...limitCell(r, now, step, text) }
-  // 따로 잡히는 한도는 슬롯 없이, 막대는 줄에 자리가 넉넉할 때만 그린다. 줄이 길어 분 단위가 먼저 사라지는 일을 막는다.
+  // 따로 잡히는 한도는 슬롯 없이 그린다. 막대는 다른 한도와 같은 단계를 따른다.
   const others: { name: string; limit: PercentLimit; step: Step }[] = [
     ...(r.secondary ? [{ name: text.weeklyShort, limit: r.secondary, step }] : []),
-    ...(r.extra ? [{ name: r.extra.short, limit: r.extra, step: { ...step, hasBar: !!step.hasExtraBar, hasNoSlot: true } }] : []),
+    ...(r.extra ? [{ name: r.extra.short, limit: r.extra, step: { ...step, hasNoSlot: true } }] : []),
   ]
   const cellOf = (o: (typeof others)[number]): Cell => ({ label: o.name, ...limitCell(o.limit, now, o.step, text) })
   if (isStacked && !step.hasOneOther) return [primary, ...others.map(cellOf)]
