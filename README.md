@@ -44,6 +44,7 @@ A source whose program isn't on the session's `PATH` gets no row, and its row co
 | Bar and `%` | How much of the limit you have used |
 | Time after `%` | Time until the limit resets |
 | `—` | No value yet. With enough room, it also says `failed`, `not installed` or `stale`. |
+| `↻` at the right end of the first row | Look up every source now. It spins until the lookups finish. |
 
 | Used | Color |
 |---|---|
@@ -56,7 +57,7 @@ The band gives up detail as the window narrows: first the Argon bar, then the mi
 In a terminal, the same information is drawn with text:
 
 ```
-Codex      5h ━━━━──────  41% 4h46m │ Wk ━━━━━━━━╸─  85% 21h13m
+Codex      5h ━━━━──────  41% 4h46m │ Wk ━━━━━━━━╸─  85% 21h13m                           ↻
 Gemini(AG) 5h ━─────────  12% 2h31m │ Wk ━━━───────  30% 5d 18h │ Ar ╸───────── 3% 5d 18h
 ```
 
@@ -89,6 +90,7 @@ To change them later, run `/plugin configure ai-usage-meter@claude-code-mods` in
 
 - **Codex, every 3 minutes:** runs `codex app-server` and asks for the rate limits, keeping only the percentages, window lengths and reset times. If that fails, it reads your recent logs in `~/.codex/sessions`.
 - **Antigravity, every 15 minutes:** runs `agy -p=/usage --output-format json`, with `agy`'s auto-update turned off for that run. After a failure it waits 30 minutes.
+- **When you press `↻`:** both lookups run right away, whatever the interval, and the interval starts again from then.
 - **Stored values:** usage values and the reason for the last failure are kept in Claude Code's plugin store on your computer, so open sessions can share one lookup.
 
 The mod sends nothing anywhere itself. `codex` and `agy` contact their own services as usual.

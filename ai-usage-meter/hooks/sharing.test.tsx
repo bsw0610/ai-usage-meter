@@ -22,8 +22,9 @@ function world(on: any, stored: Record<string, unknown> = {}) {
   const clock = mock.clock(on, { now: NOW })
   mock.env(on, { HOME: '/home/test' })
   const store: Record<string, unknown> = { ...stored }
-  const mode = { codex: 'ok', agy: 'ok', live: LIVE, codexExit: 1, codexStderr: '' }
-  const calls = { node: 0, agy: 0, agyArgv: [] as string[], attemptWhileRunning: undefined as any }
+  // agyGate: 있으면 agy 조회가 그 약속이 풀릴 때까지 끝나지 않는다(조회 중의 화면을 보려고).
+  const mode = { codex: 'ok', agy: 'ok', live: LIVE, codexExit: 1, codexStderr: '', agyGate: undefined as Promise<void> | undefined }
+  const calls = { node: 0, agy: 0, agyArgv: [] as string[], attemptWhileRunning: undefined as any, renders: 0 }
   on('store.get', (_: unknown, e: any) => ({ value: store[e.key] }))
   on('store.set', (_: unknown, e: any) => {
     store[e.key] = JSON.parse(JSON.stringify(e.value))
@@ -31,6 +32,7 @@ function world(on: any, stored: Record<string, unknown> = {}) {
   })
   on('session.start', (_: unknown, e: any) => ({ cwd: e.cwd }))
   on('ui.render', ($: any, e: any) => {
+    calls.renders++
     const { Box } = $.ui.resolve(e)
     return <Box />
   })
@@ -42,7 +44,7 @@ function world(on: any, stored: Record<string, unknown> = {}) {
         : [],
   }))
   on('fs.read', () => ({ value: log.text }))
-  on('process.run', (_: unknown, e: any) => {
+  on('process.run', async (_: unknown, e: any) => {
     if (e.argv[0] === 'node') {
       calls.node++
       calls.attemptWhileRunning = (store['attempts-v5'] as any)?.codex
@@ -52,6 +54,7 @@ function world(on: any, stored: Record<string, unknown> = {}) {
     if (e.argv[0] === 'agy') {
       calls.agy++
       calls.agyArgv = [...e.argv]
+      if (mode.agyGate) await mode.agyGate
       if (mode.agy !== 'ok') throw new Error('agy failed')
       return { value: { exitCode: 0, stdout: AGY, stderr: '' } }
     }
@@ -304,4 +307,124 @@ test('a value past its lifetime after a failure says failed, not old', async ($,
   mode.codex = 'fail'
   await clock.advance(7 * MIN)
   expect(await wide($)).toContain('Codex — failed')
+})
+
+// 새로고침 버튼의 글자. 데스크톱은 보이지 않는 전각 폭 공백이고, ↻는 그 아래 깐 그림이 그린다.
+const REST_LABEL = { terminal: '↻', desktop: '\u2003' } as const
+
+// 데스크톱 새로고침 버튼 자리: 첫째는 ↻ 그림을 한가운데에 까는 absolute Box, 둘째는 버튼과 빈 absolute Box를 담은 Box.
+// 빈 absolute Box가 버튼을 담은 Box를 위치를 가진 상자로 만들어, 버튼이 그림 위에 그려지고 누름을 받는다.
+async function refreshSpot(ui: any) {
+  const isAbsolute = (node: any) => node?.type === 'Box' && node.props?.position === 'absolute'
+  const boxes: any[] = await ui.findAll({ type: 'Box' })
+  const spot = boxes.find(b => {
+    const [picture, holder] = b.children as any[]
+    return b.children.length === 2 && isAbsolute(picture) && picture.children?.[0]?.type === 'Svg' &&
+      holder?.type === 'Box' && holder.children?.[0]?.type === 'Button' && holder.children?.[0]?.props?.key === 'refresh'
+  })
+  if (!spot) return undefined
+  const [picture, holder] = spot.children as any[]
+  return {
+    picture: picture.props,
+    svg: picture.children[0].props as { source: string; alt: string },
+    button: holder.children[0].props,
+    anchor: holder.children.slice(1).filter(isAbsolute).length,
+  }
+}
+
+test('the refresh button looks up every source at once, on both surfaces', async ($, on) => {
+  const { clock, calls } = world(on)
+  await start($, clock)
+  expect(calls.agy).toBe(1)
+  expect(calls.node).toBe(1)
+
+  for (const [i, surface] of (['terminal', 'desktop'] as const).entries()) {
+    await clock.advance(MIN)
+    const ui = await $.ui.mount({ ...BAND, surface })
+    expect((await ui.find({ type: 'Button', key: 'refresh' }))?.props.label).toBe(REST_LABEL[surface])
+    await ui.press({ key: 'refresh' })
+    expect(calls.agy).toBe(2 + i)
+    expect(calls.node).toBe(2 + i)
+    // 조회가 끝나면 버튼은 다시 쉬는 모양이다.
+    expect((await ui.find({ type: 'Button', key: 'refresh' }))?.props.label).toBe(REST_LABEL[surface])
+    await ui.unmount()
+  }
+
+  // 버튼으로 조회한 뒤에는 그때부터 간격을 다시 센다.
+  await clock.advance(2 * MIN + 30_000)
+  expect(calls.node).toBe(3)
+  expect(calls.agy).toBe(3)
+})
+
+test('the refresh button spins while a lookup runs and turns back into ↻ when it ends, on both surfaces', async ($, on) => {
+  const { clock, calls, mode } = world(on)
+  await start($, clock)
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    let open = () => {}
+    mode.agyGate = new Promise<void>(resolve => { open = resolve })
+    const ui = await $.ui.mount({ ...BAND, surface })
+    const label = async () => (await ui.find({ type: 'Button', key: 'refresh' }))?.props.label
+    let spinning = ''
+    const pressing = ui.press({ key: 'refresh' })
+    await clock.settle()
+    if (surface === 'terminal') {
+      // 터미널은 글자를 바꿔 가며 돈다.
+      expect(await label()).toBe('⠋')
+      await clock.advance(80)
+      expect(await label()).toBe('⠙')
+      await clock.advance(80)
+      expect(await label()).toBe('⠹')
+    } else {
+      // 데스크톱은 버튼(보이지 않는 글자)을 그대로 두고, 그 아래 깐 같은 ↻ 그림만 스스로 돈다. 버튼 크기도 그림 자리도 쉴 때와 같다.
+      // 앱은 버튼의 label만 그리므로, 보이는 글자를 label에 두면 그림과 겹치고 버튼이 넓어진다.
+      expect(await label()).toBe(REST_LABEL.desktop)
+      const spot = await refreshSpot(ui)
+      expect(spot?.picture).toMatchObject({ top: 0, bottom: 0, left: 0, right: 0, alignItems: 'center', justifyContent: 'center' })
+      expect(spot?.svg.alt).toBe('Refreshing')
+      expect(spot?.svg.source).toContain('<animateTransform')
+      spinning = spot?.svg.source ?? ''
+      expect(spot?.button).toMatchObject({ label: REST_LABEL.desktop, plain: true })
+      expect(spot?.anchor).toBe(1)
+    }
+
+    open()
+    await pressing
+    expect(await label()).toBe(REST_LABEL[surface])
+    // 끝나면 더 돌지 않는다.
+    await clock.advance(1_000)
+    expect(await label()).toBe(REST_LABEL[surface])
+    if (surface === 'desktop') {
+      // 쉴 때도 같은 자리에 같은 ↻ 그림을 깔되 돌지 않는다.
+      const spot = await refreshSpot(ui)
+      expect(spot?.svg.alt).toBe('Refresh')
+      expect(spot?.svg.source).not.toContain('<animateTransform')
+      // 도는 그림과 같은 그림이다(돌리는 줄만 빠진다). 그래서 멈출 때 모양이 바뀌지 않는다.
+      expect(spot?.svg.source).toBe(spinning.replace(/<animateTransform[^>]*\/>/, ''))
+      expect(spot?.anchor).toBe(1)
+    }
+    await ui.unmount()
+  }
+  expect(calls.agy).toBe(3)
+})
+
+test('with only the desktop drawing, the band is not redrawn while its picture spins', async ($, on) => {
+  const { clock, calls, mode } = world(on)
+  await start($, clock)
+  let open = () => {}
+  mode.agyGate = new Promise<void>(resolve => { open = resolve })
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  const pressing = ui.press({ key: 'refresh' })
+  await clock.settle()
+  const before = calls.renders
+  // 그림은 스스로 돈다. 다시 그리면 처음 각도로 돌아가 제자리에서 떨리므로, 조회가 끝날 때까지 다시 그리지 않는다.
+  await clock.advance(1_000)
+  expect(calls.renders).toBe(before)
+  expect((await ui.findAll({ type: 'Svg' })).some(s => s.props.alt === 'Refreshing')).toBe(true)
+
+  open()
+  await pressing
+  expect((await ui.find({ type: 'Button', key: 'refresh' }))?.props.label).toBe(REST_LABEL.desktop)
+  expect((await ui.findAll({ type: 'Svg' })).some(s => s.props.alt === 'Refresh')).toBe(true)
+  await ui.unmount()
 })

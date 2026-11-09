@@ -451,7 +451,8 @@ async function band($: any, on: any, cases: [number, string][]) {
         expect((await ui.findAll({ type: 'Text' })).map((t: any) => t.text).join(' ')).toBe(want.replace(/(Codex|Gemini\(AG\)) /g, '').replace(/ [━╸─]+/g, '').replace(/ +/g, ' '))
       } else if (surface === 'desktop') {
         // 막대가 빠진 단계도 로고는 남고, 값은 칸별로 그린다.
-        expect((await ui.findAll({ type: 'Svg' })).map((b: any) => b.props.alt)).toEqual(want.startsWith('Cx') ? ['Cx', 'AG'] : ['Codex', 'Gemini(AG)'])
+        // 새로고침 버튼 아래 까는 ↻ 그림(alt 'Refresh')은 줄의 로고가 아니다.
+        expect((await ui.findAll({ type: 'Svg' })).map((b: any) => b.props.alt).filter((alt: string) => alt !== 'Refresh')).toEqual(want.startsWith('Cx') ? ['Cx', 'AG'] : ['Codex', 'Gemini(AG)'])
         expect(await bandText(ui)).toBe(want.replace(/ +/g, ' '))
       } else {
         expect((await ui.find({ type: 'Text', text: /Cx|Codex/ }))?.text).toBe(want)
@@ -518,6 +519,16 @@ test('a third limit draws its bar only with room to spare, and gives it up befor
     'Codex      5h ━━━━━━━━──  82% 3h7m │ Wk ━━━━╸─────  46% 1d 21h',
     'Gemini(AG) 5h ━━╸───────  25% 3h   │ Wk ━─────────  10% 5d     │ Ar 3% 6d',
   ])
+})
+
+test('room kept at the end of the first row for the refresh button costs the Argon row nothing', () => {
+  // 첫 줄(Codex)은 Argon 칸이 없어 짧으므로, 그 끝의 버튼 자리 때문에 아래 줄의 Argon 막대가 빠지지 않는다.
+  for (const tail of [2, 4]) expect(formatRows(withArgon, NOW, 84, Infinity, 'en', false, tail)[1]![2]!.bar).toEqual({ percent: 3 })
+  // 한 줄뿐이면 그 줄이 자리를 비운다.
+  const alone = [{ label: 'A', reading: { ...percent(25, 3 * HOUR), extra: argon(3, 6 * DAY) } }]
+  const width = displayWidth(formatLine(alone, NOW))
+  expect(formatRows(alone, NOW, width, Infinity, 'en', false, 2)[0]![1]!.bar).toBeUndefined()
+  expect(formatRows(alone, NOW, width + 2, Infinity, 'en', false, 2)[0]![1]!.bar).toEqual({ percent: 3 })
 })
 
 test('with too little room for the minutes, the rows fall back to whole hours', () => {
@@ -794,7 +805,8 @@ test('the band keeps its bars on the desktop where the terminal has dropped them
   on('ui.render', () => ({ type: 'engine', ref: 0 }))
   const props = { hasSurvey: false, isWorking: false, bodyColumns: 55, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} }
   const desktop = await $.ui.mount({ plugin: 'ai-usage-meter', component: 'AbovePrompt', requestId: 'band', surface: 'desktop', props })
-  expect((await desktop.findAll({ type: 'Svg' })).map((b: any) => b.props.alt)).toEqual(['Codex', '18% used', 'Gemini(AG)', '25% used'])
+  // 새로고침 버튼 아래 까는 ↻ 그림(alt 'Refresh')은 줄의 로고나 막대가 아니다.
+  expect((await desktop.findAll({ type: 'Svg' })).map((b: any) => b.props.alt).filter((alt: string) => alt !== 'Refresh')).toEqual(['Codex', '18% used', 'Gemini(AG)', '25% used'])
   expect(await bandText(desktop)).toBe('Codex 5h 18% 2h │ Gemini(AG) 5h 25% 3h') // 로고는 이름으로 읽힌다
   await desktop.unmount()
   const terminal = await $.ui.mount({ plugin: 'ai-usage-meter', component: 'AbovePrompt', requestId: 'band', surface: 'terminal', props })
