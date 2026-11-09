@@ -22,7 +22,7 @@ const entries = [
 ]
 
 test('the line narrows step by step as the room shrinks', () => {
-  const bars = 'Codex 5h ━━────────  18% 2h │ Gemini(AG) 5h ━━╸───────  25% 3h'
+  const bars = 'Codex 5h ━╸───────  18% 2h │ Gemini(AG) 5h ━━╸──────  25% 3h'
   const plain = 'Codex 5h  18% 2h │ Gemini(AG) 5h  25% 3h'
   const shortHours = 'Cx 18% 2h │ AG 25% 3h'
   const short = 'Cx 18% │ AG 25%'
@@ -44,35 +44,35 @@ test('Hangul counts as two cells, and the separators as one', () => {
 
 test('the reset reads in minutes, hours or days', () => {
   const at = (ms: number) => formatLine([{ label: 'A', reading: percent(1, ms) }], NOW)
-  expect(at(35 * 60_000)).toBe('A 5h ╸─────────   1% 35m')
-  expect(at(10_000)).toBe('A 5h ╸─────────   1% 1m')
-  expect(at(47 * HOUR)).toBe('A 5h ╸─────────   1% 1d 23h')
-  expect(at(5 * 24 * HOUR)).toBe('A 5h ╸─────────   1% 5d')
+  expect(at(35 * 60_000)).toBe('A 5h ╸────────   1% 35m')
+  expect(at(10_000)).toBe('A 5h ╸────────   1% 1m')
+  expect(at(47 * HOUR)).toBe('A 5h ╸────────   1% 1d 23h')
+  expect(at(5 * 24 * HOUR)).toBe('A 5h ╸────────   1% 5d')
 })
 
 test('with room, a time under a day reads to the minute; a narrow line keeps whole hours', () => {
   const MINUTE = 60_000
   const left = (ms: number, columns?: number) => one(percent(30, ms), columns)
-  expect(left(2 * HOUR + 32 * MINUTE)).toBe('A 5h ━━━───────  30% 2h32m')
-  expect(left(2 * HOUR)).toBe('A 5h ━━━───────  30% 2h')
-  expect(left(59 * MINUTE)).toBe('A 5h ━━━───────  30% 59m')
-  expect(left(23 * HOUR + 59 * MINUTE)).toBe('A 5h ━━━───────  30% 23h59m')
-  expect(left(45 * HOUR)).toBe('A 5h ━━━───────  30% 1d 21h')
-  expect(left(2 * HOUR + 32 * MINUTE, displayWidth('A 5h ━━━───────  30% 3h'))).toBe('A 5h ━━━───────  30% 3h')
+  expect(left(2 * HOUR + 32 * MINUTE)).toBe('A 5h ━━╸──────  30% 2h32m')
+  expect(left(2 * HOUR)).toBe('A 5h ━━╸──────  30% 2h')
+  expect(left(59 * MINUTE)).toBe('A 5h ━━╸──────  30% 59m')
+  expect(left(23 * HOUR + 59 * MINUTE)).toBe('A 5h ━━╸──────  30% 23h59m')
+  expect(left(45 * HOUR)).toBe('A 5h ━━╸──────  30% 1d 21h')
+  expect(left(2 * HOUR + 32 * MINUTE, displayWidth('A 5h ━━╸──────  30% 3h'))).toBe('A 5h ━━╸──────  30% 3h')
 })
 
 test('with room, a day or more reads in days and hours; a narrow line stays short', () => {
   const left = (ms: number, columns?: number) => one(percent(30, ms), columns)
-  expect(left(44 * HOUR)).toBe('A 5h ━━━───────  30% 1d 20h')
-  expect(left(24 * HOUR)).toBe('A 5h ━━━───────  30% 1d')
-  expect(left(48 * HOUR)).toBe('A 5h ━━━───────  30% 2d')
-  expect(left(5 * 24 * HOUR + 3 * HOUR)).toBe('A 5h ━━━───────  30% 5d 3h')
-  expect(left(44 * HOUR, displayWidth('A 5h ━━━───────  30% 44h'))).toBe('A 5h ━━━───────  30% 44h')
+  expect(left(44 * HOUR)).toBe('A 5h ━━╸──────  30% 1d 20h')
+  expect(left(24 * HOUR)).toBe('A 5h ━━╸──────  30% 1d')
+  expect(left(48 * HOUR)).toBe('A 5h ━━╸──────  30% 2d')
+  expect(left(5 * 24 * HOUR + 3 * HOUR)).toBe('A 5h ━━╸──────  30% 5d 3h')
+  expect(left(44 * HOUR, displayWidth('A 5h ━━╸──────  30% 44h'))).toBe('A 5h ━━╸──────  30% 44h')
 })
 
 test('a passed reset shows 0% and no reset', () => {
-  expect(formatLine([{ label: 'A', reading: percent(80, -HOUR) }], NOW)).toBe('A 5h ──────────   0%')
-  expect(formatLine([{ label: 'A', reading: percent(80, -HOUR) }], NOW)).toBe('A 5h ──────────   0%')
+  expect(formatLine([{ label: 'A', reading: percent(80, -HOUR) }], NOW)).toBe('A 5h ─────────   0%')
+  expect(formatLine([{ label: 'A', reading: percent(80, -HOUR) }], NOW)).toBe('A 5h ─────────   0%')
 })
 
 test('counts read short, and only the narrowest step drops the unit', () => {
@@ -97,7 +97,7 @@ test('a fourth provider narrows with the others', () => {
     fake: percent(50, HOUR),
   }
   expect(lineFor([...providers, fake], readings, NOW, 200)).toBe(
-    'Codex 5h ━━────────  18% 2h │ Gemini(AG) 5h ━━╸───────  25% 3h │ Fake 5h ━━━━━─────  50% 1h',
+    'Codex 5h ━╸───────  18% 2h │ Gemini(AG) 5h ━━╸──────  25% 3h │ Fake 5h ━━━━╸────  50% 1h',
   )
   expect(lineFor([...providers, fake], readings, NOW, 20)).toBe('Cx 18% │ AG 25% │ Fk 50%')
 })
@@ -105,12 +105,12 @@ test('a fourth provider narrows with the others', () => {
 const one = (reading: any, columns?: number) => formatLine([{ label: 'A', short: 'a', reading }], NOW, columns)
 const colorOf = (reading: any) => partsOf(formatRows([{ label: 'A', reading }], NOW)[0]!).find(p => p.isStrong)?.color
 
-test('the bar keeps ten cells', () => {
-  expect(one(percent(10, 4 * HOUR))).toBe('A 5h ━─────────  10% 4h')
-  expect(one(percent(100, 30 * 60_000))).toBe('A 5h ━━━━━━━━━━ 100% 30m')
-  expect(one(percent(100, HOUR))).toBe('A 5h ━━━━━━━━━━ 100% 1h')
-  expect(one(percent(99, HOUR))).toBe('A 5h ━━━━━━━━━╸  99% 1h')
-  expect(one(percent(0, HOUR))).toBe('A 5h ──────────   0% 1h')
+test('the bar keeps nine cells', () => {
+  expect(one(percent(10, 4 * HOUR))).toBe('A 5h ━────────  10% 4h')
+  expect(one(percent(100, 30 * 60_000))).toBe('A 5h ━━━━━━━━━ 100% 30m')
+  expect(one(percent(100, HOUR))).toBe('A 5h ━━━━━━━━━ 100% 1h')
+  expect(one(percent(99, HOUR))).toBe('A 5h ━━━━━━━━╸  99% 1h')
+  expect(one(percent(0, HOUR))).toBe('A 5h ─────────   0% 1h')
 })
 
 test('the color turns orange from 80% and red only when used up', () => {
@@ -125,9 +125,9 @@ test('the color turns orange from 80% and red only when used up', () => {
 test('the line moves with the value, with no steps', () => {
   const x2 = (svg: string) => [...svg.matchAll(/x2="([\d.]+)"/g)].map(m => Number(m[1]))
   const fillEnd = (percent: number) => x2(barSvg({ percent }))[1]!
-  expect((fillEnd(50) - fillEnd(49)).toFixed(2)).toBe('0.76')
+  expect((fillEnd(50) - fillEnd(49)).toFixed(2)).toBe('0.68')
   expect(fillEnd(50.5)).toBeGreaterThan(fillEnd(50))
-  expect(fillEnd(100)).toBe(78)
+  expect(fillEnd(100)).toBe(70)
   expect(x2(barSvg({ percent: 0 }))).toHaveLength(1) // 채운 선 없이 바탕 선만
   expect(barSvg({ percent: 50 })).not.toContain('<rect')
 })
@@ -149,25 +149,25 @@ test('on the terminal the used part of the bar is blue like the desktop, and the
   expect(parts(25)).toEqual([
     { text: 'A 5h ' },
     { text: '━━╸', color: '#2c84db' },
-    { text: '─────── ' },
+    { text: '────── ' },
     { text: ' 25%', isStrong: true },
     { text: ' 1h' },
   ])
   expect(parts(85).find(p => p.text.startsWith('━'))?.color).toBe('warning')
   expect(parts(85).find(p => p.text.startsWith('─'))?.color).toBeUndefined() // 바탕은 경고여도 흐리다
   expect(parts(0).some(p => p.color)).toBe(false) // 쓰지 않았으면 칠할 곳이 없다
-  expect(parts(100).filter(p => p.color).map(p => p.text)).toEqual(['━━━━━━━━━━', '100%'])
+  expect(parts(100).filter(p => p.color).map(p => p.text)).toEqual(['━━━━━━━━━', '100%'])
 })
 
 test('a window used up shows its percent in the error color', () => {
-  expect(one(percent(100, 4 * HOUR))).toBe('A 5h ━━━━━━━━━━ 100% 4h')
+  expect(one(percent(100, 4 * HOUR))).toBe('A 5h ━━━━━━━━━ 100% 4h')
   expect(colorOf(percent(100, HOUR))).toBe('error')
 })
 
 test('a reading stored with the window fields of an older version draws with no marker or warning', () => {
   const list = [{ id: 'old', label: 'Old' }]
   const stored: any = { old: { kind: 'percent', percent: 51, resetsAt: NOW + 4 * HOUR, windowMs: 5 * HOUR, changedAt: NOW, observedAt: NOW } }
-  expect(lineFor(list, stored, NOW)).toBe('Old 5h ━━━━━─────  51% 4h')
+  expect(lineFor(list, stored, NOW)).toBe('Old 5h ━━━━╸────  51% 4h')
 })
 
 test('only the limit used up is colored, and the line stays whole, on both surfaces', async ($, on) => {
@@ -186,8 +186,8 @@ test('only the limit used up is colored, and the line stays whole, on both surfa
     })
     const colored = (await ui.findAll({ type: 'Text' })).filter(t => t.props.color)
     if (surface === 'terminal') {
-      expect(colored.map(t => [t.text, t.props.color])).toEqual([['━━━━━━━━━━', 'error'], ['100%', 'error'], ['━', '#2c84db']])
-      expect((await ui.find({ type: 'Text', text: /Gemini/ }))?.text).toBe('Codex 5h ━━━━━━━━━━ 100% 4h │ Gemini(AG) 5h ━─────────  10% 4h')
+      expect(colored.map(t => [t.text, t.props.color])).toEqual([['━━━━━━━━━', 'error'], ['100%', 'error'], ['━', '#2c84db']])
+      expect((await ui.find({ type: 'Text', text: /Gemini/ }))?.text).toBe('Codex 5h ━━━━━━━━━ 100% 4h │ Gemini(AG) 5h ━────────  10% 4h')
     } else {
       expect(colored.map(t => [t.text, t.props.color])).toEqual([['100%', 'error']])
       const [hot, cold] = (await ui.findAll({ type: 'Svg' })).filter((b: any) => /%/.test(b.props.alt))
@@ -210,8 +210,8 @@ test('each source gets its own row with both limits, and the columns line up', (
     { label: 'Gemini(AG)', short: 'AG', reading: both(25, 3 * HOUR, 10, 5 * DAY) },
   ]
   expect(formatLine(list, NOW).split('\n')).toEqual([
-    'Codex      5h ━━━━━━━━──  82% 3h7m │ Wk ━━━━╸─────  46% 1d 21h',
-    'Gemini(AG) 5h ━━╸───────  25% 3h   │ Wk ━─────────  10% 5d',
+    'Codex      5h ━━━━━━━╸─  82% 3h7m │ Wk ━━━━─────  46% 1d 21h',
+    'Gemini(AG) 5h ━━╸──────  25% 3h   │ Wk ━────────  10% 5d',
   ])
   const narrow = formatLine(list, NOW, 50).split('\n')
   expect(narrow).toEqual(['Codex      5h  82% 3h7m │ Wk  46% 1d 21h', 'Gemini(AG) 5h  25% 3h   │ Wk  10% 5d'])
@@ -224,14 +224,14 @@ test('a source with one limit or none keeps its row, and nothing stacks without 
     { label: 'Gemini(AG)', reading: null },
   ], NOW)
   expect(stacked.split('\n')[1]).toBe('Gemini(AG)    —')
-  expect(formatLine([{ label: 'A', reading: percent(1) }, { label: 'B', reading: null }], NOW)).toBe('A 5h ╸─────────   1% │ B —')
+  expect(formatLine([{ label: 'A', reading: percent(1) }, { label: 'B', reading: null }], NOW)).toBe('A 5h ╸────────   1% │ B —')
 })
 
 test('with room for one row, each source shows its more urgent limit', () => {
   const line = (reading: any) => formatLine([{ label: 'A', reading }, { label: 'B', reading: null }], NOW, Infinity, 1)
-  expect(line(both(82, 3.116 * HOUR, 46, 45 * HOUR))).toContain('A 5h ━━━━━━━━──  82%') // 5시간 쪽이 더 많이 썼다
+  expect(line(both(82, 3.116 * HOUR, 46, 45 * HOUR))).toContain('A 5h ━━━━━━━╸─  82%') // 5시간 쪽이 더 많이 썼다
   expect(line(both(10, 4 * HOUR, 95, 4 * DAY))).toContain('A Wk ') // 주간 쪽이 더 많이 썼다
-  expect(line(both(100, 4 * HOUR, 95, 4 * DAY))).toContain('A 5h ━━━━━━━━━━ 100%') // 다 쓴 쪽이 먼저다
+  expect(line(both(100, 4 * HOUR, 95, 4 * DAY))).toContain('A 5h ━━━━━━━━━ 100%') // 다 쓴 쪽이 먼저다
   expect(line(both(10, 4 * HOUR, 100, 4 * DAY))).toContain('A Wk ') // 주간을 다 쓰면 5시간 여유는 소용없다
   expect(line(both(10, 4 * HOUR, 95, -HOUR))).not.toContain('Wk') // 리셋이 지난 주간 창은 0%다
 })
@@ -267,7 +267,7 @@ test('a dash says why at the widths that have room', () => {
 
 test('a stored reading with no weekly limit still draws on one line', () => {
   const stored = { codex: { kind: 'percent' as const, percent: 60, resetsAt: NOW + HOUR, observedAt: NOW } }
-  expect(lineFor(providers, stored, NOW)).toBe('Codex 5h ━━━━━━────  60% 1h │ Gemini(AG) —')
+  expect(lineFor(providers, stored, NOW)).toBe('Codex 5h ━━━━━╸───  60% 1h │ Gemini(AG) —')
 })
 
 test('the band draws one row per source, on both surfaces', async ($, on) => {
@@ -280,8 +280,8 @@ test('the band draws one row per source, on both surfaces', async ($, on) => {
     $.ui.mount({ plugin: 'ai-usage-meter', component: 'AbovePrompt', requestId: 'band', surface, props: { ...props, maxRows } })
 
   const terminal = await mount('terminal', 5)
-  expect((await terminal.find({ type: 'Text', text: /^Codex/ }))?.text).toBe('Codex      5h ━━━━━━━━──  82% 3h7m │ Wk ━━━━╸─────  46% 1d 21h')
-  expect((await terminal.find({ type: 'Text', text: /^Gemini/ }))?.text).toBe('Gemini(AG) 5h ━━╸───────  25% 3h   │ Wk ━─────────  10% 5d')
+  expect((await terminal.find({ type: 'Text', text: /^Codex/ }))?.text).toBe('Codex      5h ━━━━━━━╸─  82% 3h7m │ Wk ━━━━─────  46% 1d 21h')
+  expect((await terminal.find({ type: 'Text', text: /^Gemini/ }))?.text).toBe('Gemini(AG) 5h ━━╸──────  25% 3h   │ Wk ━────────  10% 5d')
   await terminal.unmount()
 
   const desktop = await mount('desktop', 5)
@@ -316,24 +316,24 @@ test('each language has its own words for the reset, the days, the weekly limit 
   const list = [{ label: 'Codex', short: 'Cx', reading: both(82, 3.116 * HOUR, 46, 45 * HOUR) }]
   const line = (lang: 'en' | 'ja', columns = Infinity) => formatLine(list, NOW, columns, Infinity, lang)
 
-  expect(line('en')).toBe('Codex 5h ━━━━━━━━──  82% 3h7m │ Wk ━━━━╸─────  46% 1d 21h')
+  expect(line('en')).toBe('Codex 5h ━━━━━━━╸─  82% 3h7m │ Wk ━━━━─────  46% 1d 21h')
   expect(line('en', 40)).toBe('Codex 5h  82% 3h7m │ Wk  46% 1d 21h')
   expect(line('en', 10)).toBe('Cx 82% │ Wk 46%')
   expect(barAlt({ percent: 51.4 }, 'en')).toBe('51% used')
 
-  expect(line('ja')).toBe('Codex 5h ━━━━━━━━──  82% 3h7m │ 週 ━━━━╸─────  46% 1日21時間')
+  expect(line('ja')).toBe('Codex 5h ━━━━━━━╸─  82% 3h7m │ 週 ━━━━─────  46% 1日21時間')
   expect(line('ja', 42)).toBe('Codex 5h  82% 3h7m │ 週  46% 1日21時間')
   expect(line('ja', 10)).toBe('Cx 82% │ 週 46%')
   expect(barAlt({ percent: 51.4 }, 'ja')).toBe('51%使用')
 
   const whole = (lang: 'en' | 'ja', ms: number) => formatLine([{ label: 'A', reading: percent(1, ms) }], NOW, Infinity, Infinity, lang)
-  expect(whole('en', 48 * HOUR)).toBe('A 5h ╸─────────   1% 2d')
-  expect(whole('ja', 48 * HOUR)).toBe('A 5h ╸─────────   1% 2日')
+  expect(whole('en', 48 * HOUR)).toBe('A 5h ╸────────   1% 2d')
+  expect(whole('ja', 48 * HOUR)).toBe('A 5h ╸────────   1% 2日')
 })
 
 test('Korean keeps its own words', () => {
   const list = [{ label: 'Codex', short: 'Cx', reading: both(82, 3.116 * HOUR, 46, 45 * HOUR) }]
-  expect(formatLine(list, NOW, Infinity, Infinity, 'ko')).toBe('Codex 5h ━━━━━━━━──  82% 3h7m │ 주 ━━━━╸─────  46% 1일 21시간')
+  expect(formatLine(list, NOW, Infinity, Infinity, 'ko')).toBe('Codex 5h ━━━━━━━╸─  82% 3h7m │ 주 ━━━━─────  46% 1일 21시간')
   expect(formatLine(list, NOW, 10, Infinity, 'ko')).toBe('Cx 82% │ 주 46%')
   expect(barAlt({ percent: 51.4 }, 'ko')).toBe('51% 사용')
   const at = (attempts: any, readings: any = {}) => lineFor([{ id: 'a', label: 'Alpha' }], readings, NOW, Infinity, Infinity, attempts, 'ko')
@@ -368,14 +368,14 @@ test('at the width of a real window, every language keeps both limits with their
     { label: 'Gemini(AG)', short: 'AG', reading: both(25, 3 * HOUR, 10, 5 * DAY) },
   ]
   const rows = (lang: 'ko' | 'en' | 'ja') => formatLine(list, NOW, 85, Infinity, lang).split('\n')
-  expect(rows('ko')[0]).toBe('Codex      5h ━━━━━━━━──  82% 3h7m │ 주 ━━━━╸─────  46% 1일 21시간')
-  expect(rows('en')[0]).toBe('Codex      5h ━━━━━━━━──  82% 3h7m │ Wk ━━━━╸─────  46% 1d 21h')
-  expect(rows('ja')[0]).toBe('Codex      5h ━━━━━━━━──  82% 3h7m │ 週 ━━━━╸─────  46% 1日21時間')
+  expect(rows('ko')[0]).toBe('Codex      5h ━━━━━━━╸─  82% 3h7m │ 주 ━━━━─────  46% 1일 21시간')
+  expect(rows('en')[0]).toBe('Codex      5h ━━━━━━━╸─  82% 3h7m │ Wk ━━━━─────  46% 1d 21h')
+  expect(rows('ja')[0]).toBe('Codex      5h ━━━━━━━╸─  82% 3h7m │ 週 ━━━━─────  46% 1日21時間')
 })
 
 for (const [language, row, alt] of [
-  ['en', 'Codex      5h ━━━━━━━━──  82% 3h7m │ Wk ━━━━╸─────  46% 1d 21h', '82% used'],
-  ['ja', 'Codex      5h ━━━━━━━━──  82% 3h7m │ 週 ━━━━╸─────  46% 1日21時間', '82%使用'],
+  ['en', 'Codex      5h ━━━━━━━╸─  82% 3h7m │ Wk ━━━━─────  46% 1d 21h', '82% used'],
+  ['ja', 'Codex      5h ━━━━━━━╸─  82% 3h7m │ 週 ━━━━─────  46% 1日21時間', '82%使用'],
 ] as const) {
   test(`the language option reaches the band, on both surfaces: ${language}`, { options: { language } }, async ($, on) => {
     mock.clock(on, { now: NOW })
@@ -465,7 +465,7 @@ async function band($: any, on: any, cases: [number, string][]) {
 
 test('the band sizes its line to bodyColumns, on both surfaces', async ($, on) => {
   await band($, on, [
-    [80, 'Codex 5h ━━────────  18% 2h │ Gemini(AG) 5h ━━╸───────  25% 3h'],
+    [80, 'Codex 5h ━╸───────  18% 2h │ Gemini(AG) 5h ━━╸──────  25% 3h'],
     [50, 'Codex 5h  18% 2h │ Gemini(AG) 5h  25% 3h'],
     [26, 'Cx 18% 2h │ AG 25% 3h'],
     [15, 'Cx 18% │ AG 25%'],
@@ -482,28 +482,28 @@ const withArgon = [
 
 test('a third limit joins its source row, and the rows above keep their columns', () => {
   expect(formatLine(withArgon, NOW).split('\n')).toEqual([
-    'Codex      5h ━━━━━━━━──  82% 3h7m │ Wk ━━━━╸─────  46% 1d 21h',
-    'Gemini(AG) 5h ━━╸───────  25% 3h   │ Wk ━─────────  10% 5d     │ Ar ╸───────── 3% 6d',
+    'Codex      5h ━━━━━━━╸─  82% 3h7m │ Wk ━━━━─────  46% 1d 21h',
+    'Gemini(AG) 5h ━━╸──────  25% 3h   │ Wk ━────────  10% 5d     │ Ar ╸──────── 3% 6d',
   ])
   expect(formatLine(withArgon, NOW, 23).split('\n')).toEqual(['Cx 82% │ Wk 46%', 'AG 25% │ Wk 10% │ Ar 3%'])
   // 그보다 좁으면 셋째 칸에는 더 많이 쓴 한도 하나만 남는다(여기서는 주간 10%가 Argon 3%보다 많다).
   expect(formatLine(withArgon, NOW, 10).split('\n')).toEqual(['Cx 82% │ Wk 46%', 'AG 25% │ Wk 10%'])
 })
 
-test('at the width of a real window, every language keeps every bar, and English keeps the minutes too', () => {
+test('at the width of a real window, every language keeps every bar, and English and Japanese keep the minutes too', () => {
   const rows = (lang: 'ko' | 'en' | 'ja') => formatLine(withArgon, NOW, 85, Infinity, lang).split('\n')
   expect(rows('en')).toEqual([
-    'Codex      5h ━━━━━━━━──  82% 3h7m │ Wk ━━━━╸─────  46% 1d 21h',
-    'Gemini(AG) 5h ━━╸───────  25% 3h   │ Wk ━─────────  10% 5d     │ Ar ╸───────── 3% 6d',
+    'Codex      5h ━━━━━━━╸─  82% 3h7m │ Wk ━━━━─────  46% 1d 21h',
+    'Gemini(AG) 5h ━━╸──────  25% 3h   │ Wk ━────────  10% 5d     │ Ar ╸──────── 3% 6d',
   ])
-  // 일본어와 한국어는 날짜가 길어 같은 폭에 분 단위가 들어가지 않는다. 그래도 Argon 막대만 빠지지 않고 셋 다 남는다.
+  // 한국어는 날짜가 길어 같은 폭에 분 단위가 들어가지 않는다. 그래도 Argon 막대만 빠지지 않고 셋 다 남는다.
   expect(rows('ko')).toEqual([
-    'Codex      5h ━━━━━━━━──  82% 3h │ 주 ━━━━╸─────  46% 45h',
-    'Gemini(AG) 5h ━━╸───────  25% 3h │ 주 ━─────────  10% 5d  │ Ar ╸───────── 3% 6d',
+    'Codex      5h ━━━━━━━╸─  82% 3h │ 주 ━━━━─────  46% 45h',
+    'Gemini(AG) 5h ━━╸──────  25% 3h │ 주 ━────────  10% 5d  │ Ar ╸──────── 3% 6d',
   ])
   expect(rows('ja')).toEqual([
-    'Codex      5h ━━━━━━━━──  82% 3h │ 週 ━━━━╸─────  46% 45h',
-    'Gemini(AG) 5h ━━╸───────  25% 3h │ 週 ━─────────  10% 5d  │ Ar ╸───────── 3% 6d',
+    'Codex      5h ━━━━━━━╸─  82% 3h7m │ 週 ━━━━─────  46% 1日21時間',
+    'Gemini(AG) 5h ━━╸──────  25% 3h   │ 週 ━────────  10% 5日       │ Ar ╸──────── 3% 6日',
   ])
   for (const lang of ['en', 'ja', 'ko'] as const) expect(rows(lang).every(r => displayWidth(r) <= 85)).toBe(true)
 })
@@ -519,8 +519,8 @@ test('a third limit keeps its bar as long as the other limits do, and all the ba
     }
   }
   const third = (w: number) => formatRows(withArgon, NOW, w)[1]![2]!
-  for (const w of [Infinity, 120, 85, 84, 83, 79]) expect(third(w).bar).toEqual({ percent: 3 })
-  for (const w of [78, 60]) {
+  for (const w of [Infinity, 120, 85, 81, 80, 76]) expect(third(w).bar).toEqual({ percent: 3 })
+  for (const w of [75, 60]) {
     expect(third(w).label).toBe('Ar')
     expect(formatRows(withArgon, NOW, w).flat().some(c => c.bar)).toBe(false)
   }
@@ -537,9 +537,9 @@ test('room kept at the end of the first row for the refresh button costs the Arg
 })
 
 test('with too little room for the minutes, the rows fall back to whole hours and keep every bar', () => {
-  expect(formatLine(withArgon, NOW, 83).split('\n')).toEqual([
-    'Codex      5h ━━━━━━━━──  82% 3h │ Wk ━━━━╸─────  46% 45h',
-    'Gemini(AG) 5h ━━╸───────  25% 3h │ Wk ━─────────  10% 5d  │ Ar ╸───────── 3% 6d',
+  expect(formatLine(withArgon, NOW, 80).split('\n')).toEqual([
+    'Codex      5h ━━━━━━━╸─  82% 3h │ Wk ━━━━─────  46% 45h',
+    'Gemini(AG) 5h ━━╸──────  25% 3h │ Wk ━────────  10% 5d  │ Ar ╸──────── 3% 6d',
   ])
 })
 
@@ -558,7 +558,7 @@ test('with room for one row, a third limit shows when it is the most urgent', ()
 
 test('a third limit shows without a weekly limit, and without one nothing changes', () => {
   const alone = { ...percent(25, 3 * HOUR), extra: argon(3, 6 * DAY) }
-  expect(formatLine([{ label: 'A', reading: alone }], NOW)).toBe('A 5h ━━╸───────  25% 3h │ Ar ╸───────── 3% 6d')
+  expect(formatLine([{ label: 'A', reading: alone }], NOW)).toBe('A 5h ━━╸──────  25% 3h │ Ar ╸──────── 3% 6d')
   expect(formatLine([{ label: 'A', reading: both(25, 3 * HOUR, 10, 5 * DAY) }], NOW)).not.toContain('Argon')
 })
 
@@ -568,8 +568,8 @@ const weeklyOnly = (p: number, left: number) => ({ ...percent(p, left), isWeekly
 test('a weekly limit with no five-hour limit says it is weekly, in every language', () => {
   const list = [{ label: 'Codex', short: 'Cx', reading: weeklyOnly(54, 45 * HOUR) }, { label: 'Gemini(AG)', short: 'AG', reading: both(25, 3 * HOUR, 10, 5 * DAY) }]
   expect(formatLine(list, NOW, 85).split('\n')).toEqual([
-    'Codex      Wk ━━━━━╸────  54% 1d 21h',
-    'Gemini(AG) 5h ━━╸───────  25% 3h     │ Wk ━─────────  10% 5d',
+    'Codex      Wk ━━━━━────  54% 1d 21h',
+    'Gemini(AG) 5h ━━╸──────  25% 3h     │ Wk ━────────  10% 5d',
   ])
   expect(formatLine(list, NOW, 85, Infinity, 'ja').split('\n')[0]).toContain('Codex      週 ')
   expect(formatLine(list, NOW, 85, Infinity, 'ko').split('\n')[0]).toContain('Codex      주 ')
@@ -581,7 +581,7 @@ test('a weekly limit alone keeps saying so on one line, and with a third limit b
   expect(line(weeklyOnly(54, 45 * HOUR))).toContain('A Wk ')
   expect(line(percent(54, 3 * HOUR))).not.toContain('Wk')
   const withThird = { ...weeklyOnly(54, 45 * HOUR), extra: argon(3, 6 * DAY) }
-  expect(formatLine([{ label: 'A', reading: withThird }], NOW)).toBe('A Wk ━━━━━╸────  54% 1d 21h │ Ar ╸───────── 3% 6d')
+  expect(formatLine([{ label: 'A', reading: withThird }], NOW)).toBe('A Wk ━━━━━────  54% 1d 21h │ Ar ╸──────── 3% 6d')
   expect(line({ ...withThird, extra: argon(95, 6 * DAY) })).toContain('A Argon ')
 })
 
@@ -611,8 +611,8 @@ const realRows = [
 
 test('each limit is a named group, and the groups line up across rows', () => {
   expect(formatLine(realRows, NOW, 85).split('\n')).toEqual([
-    'Codex      5h ━━━━──────  41% 4h45m │ Wk ━━━━━╸────  53% 21h12m',
-    'Gemini(AG) 5h ──────────   0% 4h45m │ Wk ──────────   0% 7d     │ Ar ╸───────── 3% 6d',
+    'Codex      5h ━━━╸─────  41% 4h45m │ Wk ━━━━━────  53% 21h12m',
+    'Gemini(AG) 5h ─────────   0% 4h45m │ Wk ─────────   0% 7d     │ Ar ╸──────── 3% 6d',
   ])
 })
 
@@ -626,13 +626,13 @@ test('on a very narrow band each row keeps its first limit and the one used most
 
 test('a weekly limit alone sits in the first group under its own name', () => {
   const list = [{ label: 'Codex', short: 'Cx', reading: weeklyOnly(54, 45 * HOUR) }, realRows[1]!]
-  expect(formatLine(list, NOW, 85).split('\n')[0]).toBe('Codex      Wk ━━━━━╸────  54% 1d 21h')
+  expect(formatLine(list, NOW, 85).split('\n')[0]).toBe('Codex      Wk ━━━━━────  54% 1d 21h')
 })
 
 test('the shrinking order keeps the percent and the reset longest', () => {
   expect(formatLine(realRows, NOW, 80).split('\n')).toEqual([
-    'Codex      5h ━━━━──────  41% 5h │ Wk ━━━━━╸────  53% 21h',
-    'Gemini(AG) 5h ──────────   0% 5h │ Wk ──────────   0% 7d  │ Ar ╸───────── 3% 6d',
+    'Codex      5h ━━━╸─────  41% 5h │ Wk ━━━━━────  53% 21h',
+    'Gemini(AG) 5h ─────────   0% 5h │ Wk ─────────   0% 7d  │ Ar ╸──────── 3% 6d',
   ])
   expect(formatLine(realRows, NOW, 60).split('\n')).toEqual([
     'Codex      5h  41% 4h45m │ Wk  53% 21h12m',
@@ -698,11 +698,11 @@ test('on the desktop the values keep the app font with digits of one width, and 
   await ui.unmount()
 })
 
-test('the longest day format keeps every bar and the minutes at 85 on the desktop, and at 89 to 93 on the terminal', () => {
+test('the longest day format keeps every bar and the minutes at 85 on the desktop, and at 86 to 90 on the terminal', () => {
   const list = [realRows[0]!, { ...realRows[1]!, reading: { ...both(0, 4.75 * HOUR, 0, 7 * DAY), extra: argon(3, 5.75 * DAY) } }]
   const full = (rows: ReturnType<typeof formatRows>) => rows[0]![0]!.reset === '4h45m' && rows.flat().every(c => c.bar)
   const terminal = (lang: 'en' | 'ja' | 'ko', columns: number) => formatRows(list, NOW, columns, Infinity, lang)
-  for (const [lang, columns] of [['en', 89], ['ja', 92], ['ko', 93]] as const) {
+  for (const [lang, columns] of [['en', 86], ['ja', 89], ['ko', 90]] as const) {
     expect(full(terminal(lang, columns))).toBe(true)
     expect(full(terminal(lang, columns - 1))).toBe(false)
     // 데스크톱은 로고가 이름보다 좁아, 보통 폭(85)에서 어느 언어든 모두 남는다.
