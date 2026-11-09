@@ -52,7 +52,7 @@ A source whose program isn't on the session's `PATH` gets no row, and its row co
 | 80–99% | Orange |
 | 100% | Red and bold |
 
-The band gives up detail as the window narrows: first the Argon bar, then the minutes, then the other bars, then the long names, and finally the reset times.
+The band gives up detail as the window narrows: first the minutes, then the bars (all of them at once, so the Argon bar never goes alone), then the long names, and finally the reset times.
 
 In a terminal, the same information is drawn with text:
 
