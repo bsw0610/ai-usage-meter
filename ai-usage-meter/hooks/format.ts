@@ -55,6 +55,8 @@ type Strings = {
   days: (days: number, hours: number) => string
   weeklyShort: string
   used: (percent: number) => string
+  refresh: string
+  refreshing: string
 }
 
 const STRINGS: Record<Lang, Strings> = {
@@ -63,18 +65,24 @@ const STRINGS: Record<Lang, Strings> = {
     days: (days, hours) => `${days}일${hours ? ` ${hours}시간` : ''}`,
     weeklyShort: '주',
     used: percent => `${percent}% 사용`,
+    refresh: '새로 고침',
+    refreshing: '새로 고치는 중',
   },
   en: {
     trouble: { failed: 'failed', missing: 'not installed', stale: 'stale' },
     days: (days, hours) => `${days}d${hours ? ` ${hours}h` : ''}`,
     weeklyShort: 'Wk',
     used: percent => `${percent}% used`,
+    refresh: 'Refresh',
+    refreshing: 'Refreshing',
   },
   ja: {
     trouble: { failed: '失敗', missing: '未インストール', stale: '古い値' },
     days: (days, hours) => `${days}日${hours ? `${hours}時間` : ''}`,
     weeklyShort: '週',
     used: percent => `${percent}%使用`,
+    refresh: '更新',
+    refreshing: '更新中',
   },
 }
 
@@ -154,6 +162,27 @@ export const logoSvg = (content: string): string =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${LOGO_PX}" height="${LOGO_PX}" viewBox="0 0 24 24">${content}</svg>`
 
 export const barAlt = ({ percent }: Bar, lang: Lang = DEFAULT_LANG): string => STRINGS[lang].used(Math.round(percent))
+
+export const SPIN_ICON_PX = 14
+const SPIN_ICON_COLOR = 'rgba(140,140,140,0.95)' // 밝은 화면과 어두운 화면 모두에서 흐린 글자처럼 보이는 색
+const SPIN_TURN_S = 1 // 한 바퀴에 걸리는 시간
+
+// 데스크톱 새로고침 버튼의 ↻ 그림. 쉴 때와 도는 때가 같은 그림이라, 돌기 시작하고 멈출 때 모양도 자리도 바뀌지 않는다.
+// 조회하는 동안에는 SVG가 스스로(SMIL) 끊김 없이 돌므로 다시 그리지 않아도 된다.
+// 그림(img)으로 그려도 Chromium에서는 돈다(브라우저 패널에서 확인). 돌 때 화살촉이 잘리지 않게 둘레에 여백을 둔다.
+export function refreshSvg(isSpinning: boolean): string {
+  const turn = isSpinning
+    ? `<animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="${SPIN_TURN_S}s" repeatCount="indefinite"/>`
+    : ''
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${SPIN_ICON_PX}" height="${SPIN_ICON_PX}" viewBox="-1.5 -1.5 27 27"` +
+    ` fill="none" stroke="${SPIN_ICON_COLOR}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">` +
+    `<g><path d="M19.36 16.25A8.5 8.5 0 1 1 18 6l2.5 2.5"/><path d="M20.5 3.5v5h-5"/>${turn}</g></svg>`
+  )
+}
+
+export const refreshAlt = (isSpinning: boolean, lang: Lang = DEFAULT_LANG): string =>
+  isSpinning ? STRINGS[lang].refreshing : STRINGS[lang].refresh
 
 function limitCell(r: PercentLimit, now: number, step: Step, text: Strings): Omit<Cell, 'label' | 'source'> {
   const slot = (value: string) => (step.isShort || step.hasNoSlot ? value : value.padStart(PERCENT_SLOT))
@@ -277,6 +306,7 @@ const asMeasured = (rows: Cell[][], hasLogos: boolean): Cell[][] =>
 // 소스 이름을 모른 채 쌍들을 줄로 만든다. 주간 등 한도가 더 온 소스가 있고 maxRows가 허락하면 소스마다 한 줄,
 // 아니면 모두 한 줄이다. columns 칸에 들어가는 가장 자세한 단계를 고른다.
 // hasLogos: 이름 대신 로고를 그리는 표면(데스크톱). 폭을 잴 때만 쓰고, 돌려주는 칸은 그대로다.
+// firstRowTail: 첫 줄 끝에 붙는 것(새로고침 버튼)의 칸 수. 첫 줄만 그만큼 좁게 재므로, 더 긴 아래 줄은 폭을 다 쓴다.
 export function formatRows(
   entries: Entry[],
   now = 0,
@@ -284,6 +314,7 @@ export function formatRows(
   maxRows = Infinity,
   lang: Lang = DEFAULT_LANG,
   hasLogos = false,
+  firstRowTail = 0,
 ): Cell[][] {
   const text = STRINGS[lang]
   const isStacked = entries.length <= maxRows && entries.some(e => e.reading?.kind === 'percent' && (e.reading.secondary || e.reading.extra))
@@ -291,7 +322,7 @@ export function formatRows(
     const rows = render(entries, now, step, isStacked, text)
     const measured = asMeasured(rows, hasLogos)
     const widths = columnWidths(measured)
-    if (measured.every(cells => displayWidth(textOf(partsOf(cells, widths))) <= columns)) return rows
+    if (measured.every((cells, i) => displayWidth(textOf(partsOf(cells, widths))) + (i === 0 ? firstRowTail : 0) <= columns)) return rows
   }
   return render(entries, now, STEPS[STEPS.length - 1]!, isStacked, text)
 }
@@ -316,6 +347,7 @@ export function rowsFor(
   attempts: Record<string, Attempt> = {},
   lang: Lang = DEFAULT_LANG,
   hasLogos = false,
+  firstRowTail = 0,
 ): Cell[][] {
   const entries: Entry[] = list.map(p => {
     const r = readings[p.id]
@@ -327,7 +359,7 @@ export function rowsFor(
     return { ...named, reading: null, ...(trouble ? { trouble } : {}) }
   })
   const installed = entries.filter(e => e.trouble !== 'missing')
-  return formatRows(installed.length ? installed : entries, now, columns, maxRows, lang, hasLogos)
+  return formatRows(installed.length ? installed : entries, now, columns, maxRows, lang, hasLogos, firstRowTail)
 }
 
 export const lineFor = (...args: Parameters<typeof rowsFor>) => lineOf(rowsFor(...args))

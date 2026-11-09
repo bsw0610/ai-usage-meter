@@ -122,8 +122,8 @@ async function markAttempts($: EngineInterface, updates: Attempts): Promise<void
 
 // 조회할 때가 된 소스만 조회한다. 소스별 ttl 안이면 건너뛰고, 직전 조회가 실패였으면
 // retryMs가 지나야 다시 시도한다. 실패해도 직전 값은 지우지 않으며, 수명이 지나면 format이 "—"로 그린다.
-// 한 소스의 실패는 다른 소스에 번지지 않는다.
-export async function refreshDue($: EngineInterface, list: Provider[]): Promise<void> {
+// 한 소스의 실패는 다른 소스에 번지지 않는다. isForced면(새로고침 버튼) 간격과 상관없이 모두 조회한다.
+export async function refreshDue($: EngineInterface, list: Provider[], isForced = false): Promise<void> {
   await pullFromStore($)
   const io = makeIo($)
   const now = await $.clock.now()
@@ -131,7 +131,7 @@ export async function refreshDue($: EngineInterface, list: Provider[]): Promise<
 
   const due = list.filter(p => {
     const last = attempts[p.id]
-    if (!last) return true
+    if (!last || isForced) return true
     const ttl = p.ttlMs ?? DEFAULT_TTL_MS
     return now - last.at >= (last.isOk ? ttl : (p.retryMs ?? ttl))
   })
