@@ -4,7 +4,7 @@
 
 Claude Code で作業しながら、Codex と Antigravity の使用量の上限を確認できます。この mod はプロンプトの上に小さな帯を追加し、各上限の使用量とリセットまでの時間を表示します。
 
-![ダークモードの Claude Code デスクトップアプリに表示された帯。ChatGPT Codex の行と Antigravity の Gemini の行がある](docs/band.png)
+![ダークモードの Claude Code デスクトップアプリに表示された帯。ChatGPT Codex の行と Antigravity の Gemini の行があり、1行目の右端に更新ボタンがある](docs/band.png)
 
 *サンプル値を使った、mod 自身のグラフィックによるダークモードのイメージ図です（表示は英語）。*
 
