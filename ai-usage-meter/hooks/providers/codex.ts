@@ -75,6 +75,7 @@ export const codex: Provider = {
   label: 'Codex',
   short: 'Cx',
   logo: OPENAI_LOGO,
+  nameColor: 'text', // OpenAI 브랜드의 흑백: 터미널 글자색이라 어두운 화면에서 흰색, 밝은 화면에서 검정
   read: async io => {
     const now = await io.now()
     let live: ReadFailure

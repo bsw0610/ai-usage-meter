@@ -209,7 +209,10 @@ test('only the limit used up is colored, and the line stays whole, on both surfa
     })
     const colored = (await ui.findAll({ type: 'Text' })).filter(t => t.props.color)
     if (surface === 'terminal') {
-      expect(colored.map(t => [t.text, t.props.color])).toEqual([['━━━━━━━━━', 'error'], ['100%', 'error'], ['━', '#2c84db']])
+      // 소스 이름은 브랜드 색이다(Codex는 터미널 글자색, Gemini는 파랑). 한도 중에서는 다 쓴 것만 빨갛다.
+      expect(colored.map(t => [t.text, t.props.color])).toEqual([
+        ['Codex', 'text'], ['━━━━━━━━━', 'error'], ['100%', 'error'], ['Gemini(AG)', '#3186FF'], ['━', '#2c84db'],
+      ])
       expect((await ui.find({ type: 'Text', text: /Gemini/ }))?.text).toBe('Codex 5h ━━━━━━━━━ 100% 4h │ Gemini(AG) 5h ━────────  10% 4h')
     } else {
       expect(colored.map(t => [t.text, t.props.color])).toEqual([['100%', 'error']])

@@ -38,7 +38,7 @@ claude plugin install ai-usage-meter --marketplace bsw0610/ai-usage-meter --conf
 
 | 表示 | 意味 |
 |---|---|
-| ロゴまたは名前 | ソース。デスクトップでは幅にかかわらずロゴを表示し、ターミナルでは名前を使います。 |
+| ロゴまたは名前 | ソース。デスクトップでは幅にかかわらずロゴを表示し、ターミナルでは名前をソースの色で表示します（Claude は Claude Code のオレンジ、Codex は文字色、Gemini は青）。 |
 | `5h` | 5時間の上限 |
 | `週` | 週間の上限 |
 | `Ar` | Gemini Argon 用に別枠で設けられた Antigravity の週間の上限 |
