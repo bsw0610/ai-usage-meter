@@ -24,7 +24,6 @@ export type Io = {
   list: (path: string) => Promise<FsEntry[]>
   read: (path: string) => Promise<string>
   run: (argv: readonly string[], init?: ProcessRunInit) => Promise<ProcessRunResult>
-  rateLimits: () => Promise<SessionRateLimit[]>
 }
 
 export type Provider = {

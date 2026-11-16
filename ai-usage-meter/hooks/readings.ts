@@ -104,7 +104,6 @@ function makeIo($: EngineInterface): Io {
     list: path => $.fs.list(path),
     read: path => $.fs.read(path),
     run: (argv, init) => $.process.run(argv, init),
-    rateLimits: async () => (await $.session.usage()).rateLimits,
   }
 }
 

@@ -19,12 +19,13 @@ import {
   rowsFor,
 } from './format'
 import { activeProviders } from './providers'
+import { claude, fable, withFable } from './providers/claude'
 import type { Provider } from './providers'
 import { pullFromStore, put, refreshDue } from './readings'
 
 const TICK_MS = 30_000
 
-// 새로고침 버튼. 첫 줄(Codex)의 오른쪽 끝에 두고, 첫 줄만 그 자리(사이 한 칸 포함)를 빼고 잰다.
+// 새로고침 버튼. 첫 줄(Codex, 터미널에서 Claude 줄이 있으면 그 줄)의 오른쪽 끝에 두고, 첫 줄만 그 자리(사이 한 칸 포함)를 빼고 잰다.
 // 터미널은 글자 하나, 데스크톱은 앱의 버튼으로 그려져 폭을 알 수 없어 넉넉히 4칸(약 32px)으로 잡는다.
 const REFRESH_KEY = 'refresh'
 const REFRESH_LABEL = '↻'
@@ -68,20 +69,36 @@ async function refreshNow($: EngineInterface, providers: Provider[], spin: Spin)
   }
 }
 
+async function seedClaude($: EngineInterface): Promise<void> {
+  try {
+    const seed = claude.onMeasure(await $.session.usage(), await $.clock.now())
+    if (seed) await put($, claude.id, seed)
+  } catch {
+    // 값이 없을 뿐이다. 다음 session.measure가 채운다.
+  }
+}
+
 export const register: Register = (on, options) => {
   const lang = isLang(options.language) ? options.language : DEFAULT_LANG
   const providers = activeProviders(options.sources)
   const spin: Spin = { isRefreshing: false, frame: 0, drawsTerminal: false }
+  // Fable 칸은 터미널의 Claude 줄에만 붙으므로, 터미널에서 시작했거나 터미널이 그린 세션만 조회한다.
+  let startsOnTerminal = false
+  const polled = () => (startsOnTerminal || spin.drawsTerminal ? [...providers, fable] : providers)
 
   on('session.start', async ($, e, next) => {
+    startsOnTerminal = e.surface === 'terminal'
     await pullFromStore($)
+    // 이어 연 세션처럼 엔진이 이미 Claude 한도를 알고 있으면 바로 담는다. 모르면(빈 목록) 저장된 값을 그대로 둔다.
+    // 덤으로 하는 일이라, 실패해도 조회와 세션 시작을 막지 않는다.
+    void seedClaude($)
     // 조회는 세션 시작을 막지 않는다. 타이머가 주기적으로 깨어나 조회할 때가 된 소스만 조회하고,
     // ui.render 안에서는 조회하지 않는다.
-    void refreshDue($, providers)
+    void refreshDue($, polled())
     // 값이 그대로여도 시간 눈금과 남은 시간은 움직이므로 틱마다 다시 그린다.
     $.clock.every(TICK_MS, () => {
       $.ui.invalidate('ui.render')
-      return refreshDue($, providers)
+      return refreshDue($, polled())
     })
     return next(e)
   })
@@ -92,6 +109,9 @@ export const register: Register = (on, options) => {
       const reading = p.onMeasure?.(e, now)
       if (reading !== undefined) await put($, p.id, reading)
     }
+    // Claude 값은 표면과 상관없이 담아, 데스크톱 세션이 받은 값도 터미널 세션이 쓴다.
+    const own = claude.onMeasure(e, now)
+    if (own) await put($, claude.id, own)
     return next(e)
   })
 
@@ -105,7 +125,13 @@ export const register: Register = (on, options) => {
     // 데스크톱은 이름 대신 로고를 그리므로, 줄에 들어갈 자세함을 로고 폭으로 잰다.
     // 버튼은 첫 줄 끝에 붙으므로 첫 줄만 그 폭을 비운다. 아래 줄(Argon이 있는 Gemini 줄)은 폭을 다 쓴다.
     const tail = e.surface === 'terminal' ? REFRESH_CELLS_TERMINAL : REFRESH_CELLS_APP
-    const rows = rowsFor(providers, value, await $.clock.now(), e.props.bodyColumns, e.props.maxRows, lastAttempts, lang, e.surface !== 'terminal', tail)
+    // 터미널에서는 맨 윗줄에 Claude 사용량을 둔다(데스크톱 앱은 이미 보여 준다). 값이 한 번도 없으면(구독이 아니거나 첫 응답 전) 줄을 두지 않는다.
+    // Fable 칸은 Claude 줄에 붙인다(Gemini 줄의 Argon처럼).
+    const now = await $.clock.now()
+    const own = e.surface === 'terminal' ? value[claude.id] : undefined
+    const shown = own ? [claude, ...providers] : providers
+    const shownValues = own ? { ...value, [claude.id]: withFable(own, value[fable.id], now) } : value
+    const rows = rowsFor(shown, shownValues, now, e.props.bodyColumns, e.props.maxRows, lastAttempts, lang, e.surface !== 'terminal', tail)
     const widths = columnWidths(rows)
     const { Box, Text, Button } = $.ui.resolve(e)
     const textOf = (text: string) => <Text dimColor wrap="truncate-end">{text}</Text>
@@ -116,7 +142,7 @@ export const register: Register = (on, options) => {
     }
 
     // 새로고침 버튼. 조회가 도는 동안은 돌고, 끝나면 ↻ 버튼으로 돌아온다.
-    const press = () => refreshNow($, providers, spin)
+    const press = () => refreshNow($, polled(), spin)
     const refresh = (() => {
       if (e.surface === 'terminal') {
         return <Button key={REFRESH_KEY} label={spin.isRefreshing ? SPIN_FRAMES[spin.frame]! : REFRESH_LABEL} plain dimColor onPress={press} />
@@ -197,8 +223,8 @@ export const register: Register = (on, options) => {
         </Box>
       )
     }
-    // 버튼은 첫 줄(Codex)의 오른쪽 끝에 둔다. 줄들을 밴드 폭만큼 펼쳐야 끝이 밴드의 오른쪽 끝이 된다.
-    // 첫 줄은 Argon 칸이 없어 아래 줄보다 짧으므로, 버튼 자리 때문에 아래 줄이 좁아지지 않는다.
+    // 버튼은 첫 줄(Codex, 터미널에서 Claude 줄이 있으면 그 줄)의 오른쪽 끝에 둔다. 줄들을 밴드 폭만큼 펼쳐야 끝이 밴드의 오른쪽 끝이 된다.
+    // Codex 줄은 Argon 칸이 없어 아래 줄보다 짧다. Claude 줄은 Fable 칸이 붙으면 Gemini 줄과 길이가 같아, 버튼 자리만큼 먼저 줄어든다.
     const mine = (
       <Box flexDirection="column" width="100%">
         {rows.map((cells, i) => rowOf(cells, i === 0 ? refresh : undefined))}
