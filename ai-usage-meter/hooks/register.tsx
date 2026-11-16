@@ -209,7 +209,7 @@ export const register: Register = (on, options) => {
               ...(c.logo
                 ? [<Svg source={logoSvg(c.logo)} alt={c.source ?? ''} width={LOGO_PX} height={LOGO_PX} />]
                 : c.source !== undefined
-                  ? [sized(textOf(c.source), widths.source[j])]
+                  ? [sized(c.sourceColor ? <Text color={c.sourceColor} wrap="truncate-end">{c.source}</Text> : textOf(c.source), widths.source[j])]
                   : []),
               ...(widths.label[j] ? [sized(textOf(c.label), widths.label[j])] : []),
               ...(c.bar ? [<Svg source={barSvg(c.bar, c.color)} alt={barAlt(c.bar, lang)} width={BAR_WIDTH_PX} height={BAR_HEIGHT_PX} />] : []),
