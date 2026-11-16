@@ -194,7 +194,7 @@ test('only the limit used up is colored, and the line stays whole, on both surfa
       component: 'AbovePrompt',
       requestId: 'band',
       surface,
-      props: { hasSurvey: false, isWorking: false, bodyColumns: 100, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
+      props: { hasSurvey: false, isCollapsed: false, isWorking: false, bodyColumns: 100, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
     })
     const colored = (await ui.findAll({ type: 'Text' })).filter(t => t.props.color)
     if (surface === 'terminal') {
@@ -287,7 +287,7 @@ test('the band draws one row per source, on both surfaces', async ($, on) => {
   const value = { codex: both(82, 3.116 * HOUR, 46, 45 * HOUR), gemini: both(25, 3 * HOUR, 10, 5 * DAY) }
   on('state.get', () => ({ value: { value, version: 0 } }))
   on('ui.render', () => ({ type: 'engine', ref: 0 }))
-  const props = { hasSurvey: false, isWorking: false, bodyColumns: 100, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} }
+  const props = { hasSurvey: false, isCollapsed: false, isWorking: false, bodyColumns: 100, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} }
   const mount = (surface: 'terminal' | 'desktop', maxRows: number) =>
     $.ui.mount({ plugin: 'ai-usage-meter', component: 'AbovePrompt', requestId: 'band', surface, props: { ...props, maxRows } })
 
@@ -316,7 +316,7 @@ test('on the desktop a column only sets a minimum, so its widest value is never 
   const value = { codex: both(48, 4.65 * HOUR, 54, 21 * HOUR), gemini: both(0, 5 * HOUR, 0, 7 * DAY) }
   on('state.get', () => ({ value: { value, version: 0 } }))
   on('ui.render', () => ({ type: 'engine', ref: 0 }))
-  const props = { hasSurvey: false, isWorking: false, bodyColumns: 85, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} }
+  const props = { hasSurvey: false, isCollapsed: false, isWorking: false, bodyColumns: 85, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} }
   const ui = await $.ui.mount({ plugin: 'ai-usage-meter', component: 'AbovePrompt', requestId: 'band', surface: 'desktop', props })
   const boxes = (await ui.findAll({ type: 'Box' })).map((b: any) => b.props)
   expect(boxes.filter((b: any) => typeof b.minWidth === 'number').length).toBeGreaterThan(0)
@@ -400,7 +400,7 @@ for (const [language, row, alt] of [
         component: 'AbovePrompt',
         requestId: 'band',
         surface,
-        props: { hasSurvey: false, isWorking: false, bodyColumns: 100, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
+        props: { hasSurvey: false, isCollapsed: false, isWorking: false, bodyColumns: 100, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
       })
 
     const terminal = await mount('terminal')
@@ -422,7 +422,7 @@ test('a language not on the list falls back to English', { options: { language: 
     component: 'AbovePrompt',
     requestId: 'band',
     surface: 'terminal',
-    props: { hasSurvey: false, isWorking: false, bodyColumns: 100, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
+    props: { hasSurvey: false, isCollapsed: false, isWorking: false, bodyColumns: 100, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
   })
   expect((await ui.find({ type: 'Text', text: /^Codex/ }))?.text).toContain('1h')
   await ui.unmount()
@@ -454,7 +454,7 @@ async function band($: any, on: any, cases: [number, string][]) {
         component: 'AbovePrompt',
         requestId: 'band',
         surface,
-        props: { hasSurvey: false, isWorking: false, bodyColumns, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
+        props: { hasSurvey: false, isCollapsed: false, isWorking: false, bodyColumns, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
       })
       if (surface === 'desktop' && want.includes('━')) {
         // 막대가 있는 단계는 Svg로 그린다.
@@ -666,7 +666,7 @@ test('orange keeps its normal weight, and only a used-up limit is bold, on both 
   const value = { codex: both(85, 4 * HOUR, 100, 2 * DAY), gemini: both(10, 4 * HOUR, 20, 2 * DAY) }
   on('state.get', () => ({ value: { value, version: 0 } }))
   on('ui.render', () => ({ type: 'engine', ref: 0 }))
-  const props = { hasSurvey: false, isWorking: false, bodyColumns: 85, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} }
+  const props = { hasSurvey: false, isCollapsed: false, isWorking: false, bodyColumns: 85, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} }
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'ai-usage-meter', component: 'AbovePrompt', requestId: 'band', surface, props })
     const texts = await ui.findAll({ type: 'Text' })
@@ -694,7 +694,7 @@ test('on the desktop the values keep the app font with digits of one width, and 
   const value = { codex: both(41, 4.75 * HOUR, 53, 21.2 * HOUR), gemini: { ...both(0, 4.75 * HOUR, 0, 7 * DAY), extra: argon(3, 6 * DAY) } }
   on('state.get', () => ({ value: { value, version: 0 } }))
   on('ui.render', () => ({ type: 'engine', ref: 0 }))
-  const props = { hasSurvey: false, isWorking: false, bodyColumns: 85, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} }
+  const props = { hasSurvey: false, isCollapsed: false, isWorking: false, bodyColumns: 85, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} }
   const ui = await $.ui.mount({ plugin: 'ai-usage-meter', component: 'AbovePrompt', requestId: 'band', surface: 'desktop', props })
   const texts = await ui.findAll({ type: 'Text' })
   const of = (t: string) => texts.find((x: any) => x.text === t) as any
@@ -732,7 +732,7 @@ test('the reset time stands after the percent with no mark, dim and without the 
   const value = { codex: both(100, 4.75 * HOUR, 53, 21.2 * HOUR), gemini: both(85, 4.75 * HOUR, 0, 7 * DAY) }
   on('state.get', () => ({ value: { value, version: 0 } }))
   on('ui.render', () => ({ type: 'engine', ref: 0 }))
-  const props = { hasSurvey: false, isWorking: false, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} }
+  const props = { hasSurvey: false, isCollapsed: false, isWorking: false, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} }
   const mount = (surface: 'desktop' | 'terminal', bodyColumns: number) =>
     $.ui.mount({ plugin: 'ai-usage-meter', component: 'AbovePrompt', requestId: 'band', surface, props: { ...props, bodyColumns } })
 
@@ -756,7 +756,7 @@ test('on the desktop a logo stands in for the source name at every width; the te
   const value = { codex: both(41, 4.75 * HOUR, 53, 21.2 * HOUR), gemini: both(0, 4.75 * HOUR, 0, 7 * DAY) }
   on('state.get', () => ({ value: { value, version: 0 } }))
   on('ui.render', () => ({ type: 'engine', ref: 0 }))
-  const props = { hasSurvey: false, isWorking: false, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} }
+  const props = { hasSurvey: false, isCollapsed: false, isWorking: false, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} }
   const mount = (surface: 'desktop' | 'terminal', bodyColumns: number) =>
     $.ui.mount({ plugin: 'ai-usage-meter', component: 'AbovePrompt', requestId: 'band', surface, props: { ...props, bodyColumns } })
 
@@ -826,7 +826,7 @@ test('the band keeps its bars on the desktop where the terminal has dropped them
   const value = { codex: percent(18, 2 * HOUR), gemini: percent(25, 3 * HOUR) }
   on('state.get', () => ({ value: { value, version: 0 } }))
   on('ui.render', () => ({ type: 'engine', ref: 0 }))
-  const props = { hasSurvey: false, isWorking: false, bodyColumns: 55, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} }
+  const props = { hasSurvey: false, isCollapsed: false, isWorking: false, bodyColumns: 55, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} }
   const desktop = await $.ui.mount({ plugin: 'ai-usage-meter', component: 'AbovePrompt', requestId: 'band', surface: 'desktop', props })
   // 새로고침 버튼 아래 까는 ↻ 그림(alt 'Refresh')은 줄의 로고나 막대가 아니다.
   expect((await desktop.findAll({ type: 'Svg' })).map((b: any) => b.props.alt).filter((alt: string) => alt !== 'Refresh')).toEqual(['Codex', '18% used', 'Gemini(AG)', '25% used'])
