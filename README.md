@@ -38,7 +38,7 @@ A source whose program isn't on the session's `PATH` gets no row, and its row co
 
 | Part | Meaning |
 |---|---|
-| Logo or name | The source. The desktop shows the logo at every width; the terminal uses the name. |
+| Logo or name | The source. The desktop shows the logo at every width; the terminal uses the name, in the source's color (Claude in Claude Code's orange, Codex in the text color, Gemini in blue). |
 | `5h` | The five-hour limit |
 | `Wk` | The weekly limit |
 | `Ar` | Antigravity's separate weekly limit for Gemini Argon |

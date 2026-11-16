@@ -1,6 +1,7 @@
 import type { FsEntry, ProcessRunInit, ProcessRunResult, SessionRateLimit } from 'claude-code'
 
 import type { Reading } from '../../types/index'
+import type { NameColor } from '../format'
 
 export type { Reading }
 
@@ -32,6 +33,8 @@ export type Provider = {
   short: string
   // 막대를 그리는 데스크톱 줄에서 이름 대신 그릴 로고의 SVG 내용(24×24).
   logo?: string
+  // 터미널에서 소스 이름을 칠할 브랜드 색(테마 키나 #rrggbb). 없으면 흐리게 그린다.
+  nameColor?: NameColor
   // 실패하면 ReadFailure를 던진다. null은 이유 없이 값을 모른다는 뜻이다.
   read: (io: Io) => Promise<Reading | null>
   // 조회 간격(기본 3분)과 실패한 뒤 다시 시도하기까지의 간격(기본은 조회 간격과 같음).

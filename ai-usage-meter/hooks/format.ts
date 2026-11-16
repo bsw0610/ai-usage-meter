@@ -6,15 +6,18 @@ import { DEFAULT_TTL_MS } from './providers/types'
 // 값을 그릴 수 없는 이유. 없으면 아직 결과가 없다는 뜻이다.
 type Trouble = 'failed' | 'missing' | 'stale'
 
-// nameColor: 소스 이름을 칠할 테마 키(Claude는 Claude Code의 주황 'claude'). 없으면 흐리게 그린다.
-type Entry = { label: string; short?: string; logo?: string; nameColor?: ThemeKey; reading: Reading | null | undefined; trouble?: Trouble }
+// 소스 이름의 색: 테마 키나 #rrggbb. 없으면 흐리게 그린다.
+export type NameColor = ThemeKey | `#${string}`
+
+// nameColor: 소스 이름을 칠할 색(브랜드 색. Claude는 Claude Code의 주황 'claude').
+type Entry = { label: string; short?: string; logo?: string; nameColor?: NameColor; reading: Reading | null | undefined; trouble?: Trouble }
 
 // 한도의 경고 단계. 80%부터 주황, 다 쓰면 빨강.
 type Level = 'warning' | 'error'
 
 // 줄의 한 조각. 기본은 흐리게 그린다. isStrong은 사용률처럼 먼저 읽혀야 하는 값이다.
 // color는 테마 키(warning·error, 소스 이름의 색)나 막대의 채운 색(BAR_FILL)이다.
-export type Part = { text: string; color?: ThemeKey | typeof BAR_FILL; isStrong?: boolean }
+export type Part = { text: string; color?: NameColor; isStrong?: boolean }
 
 // isPending: 리셋이 지나 지금 창의 값을 아직 모른다. 바탕만 그리고, 0%라고 읽히지 않게 한다.
 export type Bar = { percent: number; isPending?: true }
@@ -22,7 +25,7 @@ export type Bar = { percent: number; isPending?: true }
 // 한도 하나의 표시. Svg를 그리는 표면은 칸별로, 터미널은 한 줄로 합쳐 그린다.
 // source: 소스 이름(줄의 첫 칸). logo: 이름 대신 그릴 수 있는 로고의 SVG 내용. label: 한도 이름. value: 사용률이나 줄표. reset: 리셋까지 남은 시간.
 // sourceColor: 소스 이름의 색(nameColor).
-export type Cell = { source?: string; sourceColor?: ThemeKey; logo?: string; label: string; bar?: Bar; value: string; reset?: string; color?: Level }
+export type Cell = { source?: string; sourceColor?: NameColor; logo?: string; label: string; bar?: Bar; value: string; reset?: string; color?: Level }
 
 // hasOneOther: 소스마다 줄을 둘 때, 첫 한도 말고는 가장 많이 쓴 한도 하나만 남긴다(가장 좁은 줄에서 끝 칸이 잘리지 않도록).
 type Step = { hasBar?: boolean; detail?: 'exact' | 'hours'; isShort?: boolean; hasNoSlot?: boolean; hasOneOther?: boolean }
@@ -356,7 +359,7 @@ export const formatLine = (entries: Entry[], now = 0, columns = Infinity, maxRow
 // 수명(기본은 조회 간격의 2배)이 지난 값은 없는 값으로 그린다.
 // 설치되지 않은 소스는 줄을 차지하지 않는다. 모두 설치되지 않았으면 밴드가 비지 않도록 그 사실을 그린다.
 export function rowsFor(
-  list: { id: string; label: string; short?: string; logo?: string; nameColor?: ThemeKey; ttlMs?: number; maxAgeMs?: number }[],
+  list: { id: string; label: string; short?: string; logo?: string; nameColor?: NameColor; ttlMs?: number; maxAgeMs?: number }[],
   readings: Record<string, Reading | null>,
   now = 0,
   columns = Infinity,

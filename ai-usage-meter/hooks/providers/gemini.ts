@@ -17,6 +17,7 @@ export const gemini: Provider = {
   label: 'Gemini(AG)',
   short: 'AG',
   logo: GEMINI_LOGO,
+  nameColor: '#3186FF', // Gemini 로고의 바탕 파랑(logos.ts)
   ttlMs: 15 * 60_000,
   retryMs: 30 * 60_000,
   read: async io => {
