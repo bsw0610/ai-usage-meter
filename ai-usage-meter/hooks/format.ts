@@ -108,17 +108,14 @@ export function displayWidth(text: string): number {
   return width
 }
 
-// exact가 있으면 하루 안쪽은 분까지, 그 위는 그 언어의 일과 시간으로 쓴다. 좁은 줄에서는 한 단위로 반올림한다.
-function until(ms: number, exact?: Strings): string {
+// 하루가 넘으면 그 언어의 일과 시간으로 쓴다(1d 6h, 1일 6시간). 하루 안쪽은 isExact면 분까지(2h32m), 좁은 줄에서는 시간으로 반올림한다(3h).
+function until(ms: number, text: Strings, isExact: boolean): string {
   const minutes = Math.max(1, Math.round(ms / 60_000))
   if (minutes < 60) return `${minutes}m`
-  if (exact && minutes < 24 * 60) return `${Math.floor(minutes / 60)}h${minutes % 60 ? `${minutes % 60}m` : ''}`
-  if (exact) {
-    const totalHours = Math.round(minutes / 60)
-    return exact.days(Math.floor(totalHours / 24), totalHours % 24)
-  }
-  const hours = Math.round(minutes / 60)
-  return hours < 48 ? `${hours}h` : `${Math.round(hours / 24)}d`
+  if (isExact && minutes < 24 * 60) return `${Math.floor(minutes / 60)}h${minutes % 60 ? `${minutes % 60}m` : ''}`
+  const totalHours = Math.round(minutes / 60)
+  if (totalHours < 24) return `${totalHours}h`
+  return text.days(Math.floor(totalHours / 24), totalHours % 24)
 }
 
 function shortCount(n: number): string {
@@ -203,8 +200,8 @@ function limitCell(r: PercentLimit, now: number, step: Step, text: Strings): Omi
   const color = shown >= RED_FROM_PERCENT ? ('error' as const) : shown >= ORANGE_FROM_PERCENT ? ('warning' as const) : undefined
   const time =
     left === undefined ? undefined
-    : step.detail === 'exact' ? until(left, text)
-    : step.detail === 'hours' ? until(left)
+    : step.detail === 'exact' ? until(left, text, true)
+    : step.detail === 'hours' ? until(left, text, false)
     : undefined
   return {
     ...(step.hasBar ? { bar: { percent: r.percent } } : {}),

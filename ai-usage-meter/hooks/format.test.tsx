@@ -61,13 +61,24 @@ test('with room, a time under a day reads to the minute; a narrow line keeps who
   expect(left(2 * HOUR + 32 * MINUTE, displayWidth('A 5h ━━╸──────  30% 3h'))).toBe('A 5h ━━╸──────  30% 3h')
 })
 
-test('with room, a day or more reads in days and hours; a narrow line stays short', () => {
+test('a day or more always reads in days and hours, also on a narrow line', () => {
   const left = (ms: number, columns?: number) => one(percent(30, ms), columns)
   expect(left(44 * HOUR)).toBe('A 5h ━━╸──────  30% 1d 20h')
   expect(left(24 * HOUR)).toBe('A 5h ━━╸──────  30% 1d')
   expect(left(48 * HOUR)).toBe('A 5h ━━╸──────  30% 2d')
   expect(left(5 * 24 * HOUR + 3 * HOUR)).toBe('A 5h ━━╸──────  30% 5d 3h')
-  expect(left(44 * HOUR, displayWidth('A 5h ━━╸──────  30% 44h'))).toBe('A 5h ━━╸──────  30% 44h')
+  // 분이 들어가지 않는 폭에서도 하루가 넘는 시간은 30h가 아니라 1d 6h다(사용자 요청). 반올림해 24시간이 되면 1d다.
+  const MINUTE = 60_000
+  const pair = (fiveLeft: number, weekLeft: number, columns: number) =>
+    formatLine([{ label: 'A', reading: both(30, fiveLeft, 46, weekLeft) }], NOW, columns)
+  const narrow = 'A 5h ━━╸──────  30% 3h │ Wk ━━━━─────  46% 1d 6h'
+  expect(pair(2 * HOUR + 32 * MINUTE, 30 * HOUR, displayWidth(narrow))).toBe(narrow)
+  expect(pair(2 * HOUR + 32 * MINUTE, 23 * HOUR + 40 * MINUTE, displayWidth(narrow))).toMatch(/ 46% 1d$/)
+  for (const lang of ['en', 'ja', 'ko'] as const) {
+    for (let w = 8; w <= 120; w++) {
+      for (const c of formatRows(withArgon, NOW, w, Infinity, lang).flat()) expect(c.reset ?? '').not.toMatch(/^(2[4-9]|[3-9]\d|\d{3,})h$/)
+    }
+  }
 })
 
 test('a passed reset shows a dash until the next check, not 0%, from the very moment of the reset', () => {
@@ -510,8 +521,8 @@ test('at the width of a real window, every language keeps every bar, and English
   ])
   // 한국어는 날짜가 길어 같은 폭에 분 단위가 들어가지 않는다. 그래도 Argon 막대만 빠지지 않고 셋 다 남는다.
   expect(rows('ko')).toEqual([
-    'Codex      5h ━━━━━━━╸─  82% 3h │ 주 ━━━━─────  46% 45h',
-    'Gemini(AG) 5h ━━╸──────  25% 3h │ 주 ━────────  10% 5d  │ Ar ╸──────── 3% 6d',
+    'Codex      5h ━━━━━━━╸─  82% 3h │ 주 ━━━━─────  46% 1일 21시간',
+    'Gemini(AG) 5h ━━╸──────  25% 3h │ 주 ━────────  10% 5일        │ Ar ╸──────── 3% 6일',
   ])
   expect(rows('ja')).toEqual([
     'Codex      5h ━━━━━━━╸─  82% 3h7m │ 週 ━━━━─────  46% 1日21時間',
@@ -531,8 +542,8 @@ test('a third limit keeps its bar as long as the other limits do, and all the ba
     }
   }
   const third = (w: number) => formatRows(withArgon, NOW, w)[1]![2]!
-  for (const w of [Infinity, 120, 85, 81, 80, 76]) expect(third(w).bar).toEqual({ percent: 3 })
-  for (const w of [75, 60]) {
+  for (const w of [Infinity, 120, 85, 81, 80, 79]) expect(third(w).bar).toEqual({ percent: 3 })
+  for (const w of [78, 60]) {
     expect(third(w).label).toBe('Ar')
     expect(formatRows(withArgon, NOW, w).flat().some(c => c.bar)).toBe(false)
   }
@@ -550,8 +561,8 @@ test('room kept at the end of the first row for the refresh button costs the Arg
 
 test('with too little room for the minutes, the rows fall back to whole hours and keep every bar', () => {
   expect(formatLine(withArgon, NOW, 80).split('\n')).toEqual([
-    'Codex      5h ━━━━━━━╸─  82% 3h │ Wk ━━━━─────  46% 45h',
-    'Gemini(AG) 5h ━━╸──────  25% 3h │ Wk ━────────  10% 5d  │ Ar ╸──────── 3% 6d',
+    'Codex      5h ━━━━━━━╸─  82% 3h │ Wk ━━━━─────  46% 1d 21h',
+    'Gemini(AG) 5h ━━╸──────  25% 3h │ Wk ━────────  10% 5d     │ Ar ╸──────── 3% 6d',
   ])
 })
 
