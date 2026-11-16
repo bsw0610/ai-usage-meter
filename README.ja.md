@@ -2,7 +2,7 @@
 
 [English](README.md) | 日本語
 
-Claude Code で作業しながら、Codex と Antigravity の使用量の上限を確認できます。この mod はプロンプトの上に小さな帯を追加し、各上限の使用量とリセットまでの時間を表示します。
+Claude Code で作業しながら、Codex と Antigravity の使用量の上限を確認できます。この mod はプロンプトの上に小さな帯を追加し、各上限の使用量とリセットまでの時間を表示します。ターミナルでは、Claude 自身の上限も一番上の行に表示します。
 
 ![ダークモードの Claude Code デスクトップアプリに表示された帯。ChatGPT Codex の行と Antigravity の Gemini の行があり、1行目の右端に更新ボタンがある](docs/band.png)
 
@@ -30,6 +30,7 @@ claude plugin install ai-usage-meter --marketplace bsw0610/ai-usage-meter --conf
 |---|---|
 | Codex | `PATH` 上の `codex` CLI と Node.js。ない場合は `~/.codex/sessions` の最近のログを読みます。 |
 | Antigravity | サインイン済みの `agy` CLI。1.4.12 で動作を確認しています。 |
+| Claude（ターミナル） | Claude のサブスクリプション。Fable の欄には `PATH` 上の `claude` コマンドも必要です。2.1.325 で動作を確認しています。 |
 
 セッションの `PATH` にプログラムが見つからないソースの行は表示されず、見つかるようになると行が戻ります。どちらも見つからない場合は、帯にその旨を表示します。
 
@@ -41,6 +42,7 @@ claude plugin install ai-usage-meter --marketplace bsw0610/ai-usage-meter --conf
 | `5h` | 5時間の上限 |
 | `週` | 週間の上限 |
 | `Ar` | Gemini Argon 用に別枠で設けられた Antigravity の週間の上限 |
+| `Fa` | Fable 用に別枠で設けられた Claude の週間の上限（ターミナルのみ） |
 | バーと `%` | 上限のうち使用した割合 |
 | `%` の後の時間 | 上限がリセットされるまでの時間 |
 | `—` | まだ値がありません。幅に余裕があれば `失敗`、`未インストール`、`古い値` も表示します。上限の横にある場合は、上限がリセットされ、次の確認まで新しい使用量がわからないことを示します。 |
@@ -54,19 +56,24 @@ claude plugin install ai-usage-meter --marketplace bsw0610/ai-usage-meter --conf
 
 ウィンドウが狭くなると、分、バー（Argon のバーだけが先に消えないよう、すべて同時に）、長い名前、リセットまでの時間の順に省略します。
 
-ターミナルでは、同じ内容を文字で表示します。
+ターミナルでは、同じ内容を文字で表示し、一番上に Claude の行を加えます。
 
 ```
-Codex      5h ━━━╸─────  41% 4h46m │ 週 ━━━━━━━╸─  85% 21h13m                                ↻
-Gemini(AG) 5h ━────────  12% 2h31m │ 週 ━━╸──────  30% 5日18時間 │ Ar ╸──────── 3% 5日18時間
+Claude     5h ━━───────  23% 3h5m  │ 週 ━────────   9% 4日2時間  │ Fa ━━━────── 31% 4日2時間   ↻
+Codex      5h ━━━╸─────  41% 4h46m │ 週 ━━━━━━━╸─  85% 21h13m
+Gemini(AG) 5h ━────────  12% 2h31m │ 週 ━━╸──────  30% 5日18時間 │ Ar ╸──────── 3%  5日18時間
 ```
+
+Claude の行には、このコンピューターで Claude Code が最後に伝えた上限を表示します。サブスクリプションでは、インストール直後は最初の応答で値が届きます。API キーでの利用では上限が伝えられないため、Claude の行はありません。デスクトップアプリはすでにこの上限を表示しているため、帯には Claude の行を出しません。
+
+`Fa` は Fable 用に別枠で設けられた Claude の週間の上限です。Claude Code はこの値を mod に渡さないため、mod が `claude` コマンドに問い合わせます（下記参照）。この取得に失敗した場合は `Fa` だけが消えます。
 
 ## 設定
 
 | オプション | 値 | 既定値 | 意味 |
 |---|---|---|---|
 | `language` | `en`、`ja`、`ko` | `en` | 帯の言語 |
-| `sources` | `all`、`codex`、`gemini` | `all` | 取得して表示するソース。オフにしたソースのプログラムは実行しません。 |
+| `sources` | `all`、`codex`、`gemini` | `all` | 取得して表示するソース。オフにしたソースのプログラムは実行しません。ターミナルの Claude の行はどの値でも表示します。 |
 
 シェルからインストールするときに指定できます。
 
@@ -90,10 +97,12 @@ claude plugin install ai-usage-meter --marketplace bsw0610/ai-usage-meter --conf
 
 - **Codex（3分ごと）:** `codex app-server` を実行してレート制限を問い合わせ、使用率、期間の長さ、リセット時刻だけを残します。失敗した場合は `~/.codex/sessions` の最近のログを読みます。
 - **Antigravity（15分ごと）:** `agy -p=/usage --output-format json` を実行します。この実行では `agy` の自動更新をオフにします。失敗すると30分待ちます。
-- **`↻` を押したとき:** 間隔にかかわらず両方の取得をすぐに実行し、そこから間隔を数え直します。
+- **Claude の5時間と週間:** 何も実行しません。Claude Code が応答のたびに上限を伝え、mod は最後の値を残します。
+- **Claude の Fable（5分ごと、ターミナルのセッションのみ）:** `claude -p` を実行してプランの使用量（`/usage` と同じ値）を問い合わせ、Fable の使用率とリセット時刻だけを残します。モデルは呼び出さず、フックや MCP サーバーを読み込まず、セッションも保存しません。この問い合わせは公開されたインターフェースではないため、Claude Code の更新で動かなくなる可能性があります。失敗すると15分待ちます。
+- **`↻` を押したとき:** 間隔にかかわらずすべての取得をすぐに実行し、そこから間隔を数え直します。
 - **保存する値:** 使用量の値と最後の失敗の理由を、お使いのコンピューター上の Claude Code プラグインストアに保存します。開いているセッションが1回の取得を共有するためです。
 
-mod 自身はどこにも何も送信しません。`codex` と `agy` は通常どおりそれぞれのサービスに接続します。
+mod 自身はどこにも何も送信しません。`codex`、`agy`、`claude` は通常どおりそれぞれのサービスに接続します。
 
 ## 既知の制限
 
@@ -116,7 +125,7 @@ claude plugin validate ai-usage-meter
 
 ## クレジットと商標
 
-これは独立したプロジェクトであり、OpenAI や Google との提携や承認を受けたものではありません。ChatGPT、Codex、Gemini、Antigravity はそれぞれの所有者の商標であり、ロゴは各ソースを識別するためだけに使用しています。ロゴの図版は [LobeHub Icons](https://github.com/lobehub/lobe-icons) のものです。詳しくは [THIRD_PARTY_NOTICES.md](ai-usage-meter/THIRD_PARTY_NOTICES.md) をご覧ください。
+これは独立したプロジェクトであり、Anthropic、OpenAI、Google との提携や承認を受けたものではありません。Claude、ChatGPT、Codex、Gemini、Antigravity はそれぞれの所有者の商標であり、ロゴは各ソースを識別するためだけに使用しています。ロゴの図版は [LobeHub Icons](https://github.com/lobehub/lobe-icons) のものです。詳しくは [THIRD_PARTY_NOTICES.md](ai-usage-meter/THIRD_PARTY_NOTICES.md) をご覧ください。
 
 ## ライセンス
 

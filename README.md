@@ -2,7 +2,7 @@
 
 English | [日本語](README.ja.md)
 
-See your Codex and Antigravity usage limits while you work in Claude Code. This mod adds a small band above the prompt with how much of each limit you have used and when it resets.
+See your Codex and Antigravity usage limits while you work in Claude Code. This mod adds a small band above the prompt with how much of each limit you have used and when it resets. In a terminal, it also shows Claude's own limits on the top row.
 
 ![The band on the Claude Code desktop app in dark mode, with one row for ChatGPT Codex and one for Gemini in Antigravity, and the refresh button at the right end of the first row](docs/band.png)
 
@@ -30,6 +30,7 @@ claude plugin install ai-usage-meter --marketplace bsw0610/ai-usage-meter
 |---|---|
 | Codex | The `codex` CLI and Node.js on your `PATH`. Without them, the mod falls back to your recent logs in `~/.codex/sessions`. |
 | Antigravity | The `agy` CLI, signed in. Tested with 1.4.12. |
+| Claude (terminal) | A Claude subscription. The Fable cell also needs the `claude` command on your `PATH`. Tested with 2.1.325. |
 
 A source whose program isn't on the session's `PATH` gets no row, and its row comes back once the program is found. If neither is found, the band says so.
 
@@ -41,6 +42,7 @@ A source whose program isn't on the session's `PATH` gets no row, and its row co
 | `5h` | The five-hour limit |
 | `Wk` | The weekly limit |
 | `Ar` | Antigravity's separate weekly limit for Gemini Argon |
+| `Fa` | Claude's separate weekly limit for Fable (terminal only) |
 | Bar and `%` | How much of the limit you have used |
 | Time after `%` | Time until the limit resets |
 | `—` | No value yet. With enough room, it also says `failed`, `not installed` or `stale`. Next to a limit, it means the limit has reset and the new usage is not known until the next check. |
@@ -54,19 +56,24 @@ A source whose program isn't on the session's `PATH` gets no row, and its row co
 
 The band gives up detail as the window narrows: first the minutes, then the bars (all of them at once, so the Argon bar never goes alone), then the long names, and finally the reset times.
 
-In a terminal, the same information is drawn with text:
+In a terminal, the same information is drawn with text, with a row for Claude on top:
 
 ```
-Codex      5h ━━━╸─────  41% 4h46m │ Wk ━━━━━━━╸─  85% 21h13m                          ↻
-Gemini(AG) 5h ━────────  12% 2h31m │ Wk ━━╸──────  30% 5d 18h │ Ar ╸──────── 3% 5d 18h
+Claude     5h ━━───────  23% 3h5m  │ Wk ━────────   9% 4d 2h  │ Fa ━━━────── 31% 4d 2h   ↻
+Codex      5h ━━━╸─────  41% 4h46m │ Wk ━━━━━━━╸─  85% 21h13m
+Gemini(AG) 5h ━────────  12% 2h31m │ Wk ━━╸──────  30% 5d 18h │ Ar ╸──────── 3%  5d 18h
 ```
+
+The Claude row shows the last limits Claude Code reported on this computer. On a subscription, a fresh install gets them with the first response; on an API key there are none, so there is no Claude row. The desktop app already shows these limits, so its band leaves the row out.
+
+The `Fa` cell is Claude's separate weekly limit for Fable. Claude Code doesn't hand it to mods, so the mod asks the `claude` command for it (see below). If that lookup fails, only the `Fa` cell goes away.
 
 ## Settings
 
 | Option | Values | Default | Meaning |
 |---|---|---|---|
 | `language` | `en`, `ja`, `ko` | `en` | The language of the band |
-| `sources` | `all`, `codex`, `gemini` | `all` | The sources to look up and show. A source turned off runs nothing. |
+| `sources` | `all`, `codex`, `gemini` | `all` | The sources to look up and show. A source turned off runs nothing. The Claude row in a terminal stays either way. |
 
 Set them when you install from a shell:
 
@@ -90,10 +97,12 @@ To change them later, run `/plugin configure ai-usage-meter@claude-code-mods` in
 
 - **Codex, every 3 minutes:** runs `codex app-server` and asks for the rate limits, keeping only the percentages, window lengths and reset times. If that fails, it reads your recent logs in `~/.codex/sessions`.
 - **Antigravity, every 15 minutes:** runs `agy -p=/usage --output-format json`, with `agy`'s auto-update turned off for that run. After a failure it waits 30 minutes.
-- **When you press `↻`:** both lookups run right away, whatever the interval, and the interval starts again from then.
+- **Claude, five-hour and weekly:** nothing is run. Claude Code reports these limits itself after each response, and the mod keeps the last figures.
+- **Claude, Fable, every 5 minutes, terminal sessions only:** runs `claude -p` and asks it for your plan usage (the numbers behind `/usage`), keeping only the Fable percentage and reset time. No model is called, and the run loads no hooks or MCP servers and saves no session. This request isn't a documented interface, so a Claude Code update may break it. After a failure it waits 15 minutes.
+- **When you press `↻`:** every lookup runs right away, whatever the interval, and the interval starts again from then.
 - **Stored values:** usage values and the reason for the last failure are kept in Claude Code's plugin store on your computer, so open sessions can share one lookup.
 
-The mod sends nothing anywhere itself. `codex` and `agy` contact their own services as usual.
+The mod sends nothing anywhere itself. `codex`, `agy` and `claude` contact their own services as usual.
 
 ## Known limits
 
@@ -116,7 +125,7 @@ claude plugin validate ai-usage-meter
 
 ## Credits and trademarks
 
-This is an independent project, not affiliated with or endorsed by OpenAI or Google. ChatGPT, Codex, Gemini and Antigravity are trademarks of their respective owners, and the logos are used only to identify each source. Logo artwork comes from [LobeHub Icons](https://github.com/lobehub/lobe-icons); see [THIRD_PARTY_NOTICES.md](ai-usage-meter/THIRD_PARTY_NOTICES.md).
+This is an independent project, not affiliated with or endorsed by Anthropic, OpenAI or Google. Claude, ChatGPT, Codex, Gemini and Antigravity are trademarks of their respective owners, and the logos are used only to identify each source. Logo artwork comes from [LobeHub Icons](https://github.com/lobehub/lobe-icons); see [THIRD_PARTY_NOTICES.md](ai-usage-meter/THIRD_PARTY_NOTICES.md).
 
 ## License
 
