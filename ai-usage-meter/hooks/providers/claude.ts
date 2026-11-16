@@ -27,6 +27,7 @@ export const claude = {
   id: 'claude',
   label: 'Claude',
   short: 'Cl',
+  nameColor: 'claude' as const, // Claude Code CLI의 주황. 테마를 따른다.
   maxAgeMs: Infinity, // 값이 움직일 때만 오므로 오래돼도 유효하다. 리셋이 지난 창은 format이 "—"로 그린다.
   onMeasure: (m: { rateLimits: SessionRateLimit[] }, now: number) => pick(m.rateLimits, now),
 }

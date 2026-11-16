@@ -239,3 +239,17 @@ test('with the Fable cell and the refresh button, no row runs past the band at a
   // 넓으면 막대가 있고, 좁아지면 모든 줄의 막대가 함께 빠진다.
   expect([...seen].sort()).toEqual(['bars', 'no bars'])
 })
+
+test('on the terminal, the Claude name is drawn in Claude Code orange and only the name', async ($, on) => {
+  const { clock } = world(on, [FIVE, WEEK])
+  await start($, clock)
+  for (const bodyColumns of [120, 30]) {
+    const ui = await $.ui.mount({ ...BAND, props: { ...BAND.props, bodyColumns }, surface: 'terminal' })
+    const texts: any[] = await ui.findAll({ type: 'Text' })
+    const colored = texts.filter(t => t.props?.color === 'claude').map(t => t.text)
+    // 좁으면 짧은 이름(Cl)도 같은 색이다. 칸을 맞추는 빈칸과 Codex·Gemini 이름은 칠하지 않는다.
+    expect(colored).toEqual([bodyColumns === 120 ? 'Claude' : 'Cl'])
+    expect((await bandText(ui)).split('\n')[0]).toMatch(bodyColumns === 120 ? /^Claude     5h / : /^Cl /)
+    await ui.unmount()
+  }
+})

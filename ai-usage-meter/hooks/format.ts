@@ -1,24 +1,28 @@
+import type { ThemeKey } from 'claude-code'
+
 import type { Attempt, PercentLimit, Reading } from '../types/index'
 import { DEFAULT_TTL_MS } from './providers/types'
 
 // 값을 그릴 수 없는 이유. 없으면 아직 결과가 없다는 뜻이다.
 type Trouble = 'failed' | 'missing' | 'stale'
 
-type Entry = { label: string; short?: string; logo?: string; reading: Reading | null | undefined; trouble?: Trouble }
+// nameColor: 소스 이름을 칠할 테마 키(Claude는 Claude Code의 주황 'claude'). 없으면 흐리게 그린다.
+type Entry = { label: string; short?: string; logo?: string; nameColor?: ThemeKey; reading: Reading | null | undefined; trouble?: Trouble }
 
 // 한도의 경고 단계. 80%부터 주황, 다 쓰면 빨강.
 type Level = 'warning' | 'error'
 
 // 줄의 한 조각. 기본은 흐리게 그린다. isStrong은 사용률처럼 먼저 읽혀야 하는 값이다.
-// color는 테마 키(warning·error)나 막대의 채운 색(BAR_FILL)이다.
-export type Part = { text: string; color?: Level | typeof BAR_FILL; isStrong?: boolean }
+// color는 테마 키(warning·error, 소스 이름의 색)나 막대의 채운 색(BAR_FILL)이다.
+export type Part = { text: string; color?: ThemeKey | typeof BAR_FILL; isStrong?: boolean }
 
 // isPending: 리셋이 지나 지금 창의 값을 아직 모른다. 바탕만 그리고, 0%라고 읽히지 않게 한다.
 export type Bar = { percent: number; isPending?: true }
 
 // 한도 하나의 표시. Svg를 그리는 표면은 칸별로, 터미널은 한 줄로 합쳐 그린다.
 // source: 소스 이름(줄의 첫 칸). logo: 이름 대신 그릴 수 있는 로고의 SVG 내용. label: 한도 이름. value: 사용률이나 줄표. reset: 리셋까지 남은 시간.
-export type Cell = { source?: string; logo?: string; label: string; bar?: Bar; value: string; reset?: string; color?: Level }
+// sourceColor: 소스 이름의 색(nameColor).
+export type Cell = { source?: string; sourceColor?: ThemeKey; logo?: string; label: string; bar?: Bar; value: string; reset?: string; color?: Level }
 
 // hasOneOther: 소스마다 줄을 둘 때, 첫 한도 말고는 가장 많이 쓴 한도 하나만 남긴다(가장 좁은 줄에서 끝 칸이 잘리지 않도록).
 type Step = { hasBar?: boolean; detail?: 'exact' | 'hours'; isShort?: boolean; hasNoSlot?: boolean; hasOneOther?: boolean }
@@ -220,7 +224,7 @@ function isMoreUrgent(a: PercentLimit, b: PercentLimit, now: number): boolean {
 // 소스 하나의 칸들. 나란히 놓을 수 없으면 더 급한 한도 하나만 남긴다.
 function cellsOf(e: Entry, now: number, step: Step, isStacked: boolean, text: Strings): Cell[] {
   const source = step.isShort ? (e.short ?? e.label) : e.label
-  const named = { source, ...(e.logo ? { logo: e.logo } : {}) }
+  const named = { source, ...(e.nameColor ? { sourceColor: e.nameColor } : {}), ...(e.logo ? { logo: e.logo } : {}) }
   const r = e.reading
   if (!r) return [{ ...named, label: '', value: step.detail && e.trouble ? `${DASH} ${text.trouble[e.trouble]}` : DASH }]
   if (r.kind === 'count') {
@@ -282,7 +286,14 @@ export function partsOf(cells: Cell[], widths: ColumnWidths = columnWidths([cell
   cells.forEach((c, j) => {
     const isLast = j === cells.length - 1
     const resetWidth = widths.reset[j] ?? 0
-    add({ text: `${j ? ` ${SEPARATOR} ` : ''}${named(c.source ?? '', widths.source[j])}${named(c.label, widths.label[j])}` })
+    // 색이 있는 소스 이름은 이름만 칠하고, 칸을 맞추는 빈칸은 흐린 조각에 둔다.
+    if (c.sourceColor && c.source && widths.source[j]) {
+      if (j) add({ text: ` ${SEPARATOR} ` })
+      add({ text: c.source, color: c.sourceColor })
+      add({ text: `${' '.repeat(Math.max(0, (widths.source[j] ?? 0) - displayWidth(c.source)))} ${named(c.label, widths.label[j])}` })
+    } else {
+      add({ text: `${j ? ` ${SEPARATOR} ` : ''}${named(c.source ?? '', widths.source[j])}${named(c.label, widths.label[j])}` })
+    }
     // 막대는 데스크톱과 같이 채운 부분만 파랑(경고면 그 색)으로, 바탕은 흐리게 그린다.
     if (c.bar) {
       const { used, left } = barText(c.bar)
@@ -345,7 +356,7 @@ export const formatLine = (entries: Entry[], now = 0, columns = Infinity, maxRow
 // 수명(기본은 조회 간격의 2배)이 지난 값은 없는 값으로 그린다.
 // 설치되지 않은 소스는 줄을 차지하지 않는다. 모두 설치되지 않았으면 밴드가 비지 않도록 그 사실을 그린다.
 export function rowsFor(
-  list: { id: string; label: string; short?: string; logo?: string; ttlMs?: number; maxAgeMs?: number }[],
+  list: { id: string; label: string; short?: string; logo?: string; nameColor?: ThemeKey; ttlMs?: number; maxAgeMs?: number }[],
   readings: Record<string, Reading | null>,
   now = 0,
   columns = Infinity,
@@ -358,7 +369,7 @@ export function rowsFor(
   const entries: Entry[] = list.map(p => {
     const r = readings[p.id]
     const maxAge = p.maxAgeMs ?? 2 * (p.ttlMs ?? DEFAULT_TTL_MS)
-    const named = { label: p.label, short: p.short, ...(p.logo ? { logo: p.logo } : {}) }
+    const named = { label: p.label, short: p.short, ...(p.nameColor ? { nameColor: p.nameColor } : {}), ...(p.logo ? { logo: p.logo } : {}) }
     if (r && now - r.observedAt <= maxAge) return { ...named, reading: r }
     const last = attempts[p.id]
     const trouble: Trouble | undefined = last && !last.isOk ? (last.isMissing ? 'missing' : 'failed') : r ? 'stale' : undefined
