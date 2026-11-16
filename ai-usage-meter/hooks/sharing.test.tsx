@@ -12,7 +12,7 @@ const BAND = {
   component: 'AbovePrompt',
   requestId: 'band',
   surface: 'desktop',
-  props: { hasSurvey: false, isWorking: false, bodyColumns: 12, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
+  props: { hasSurvey: false, isCollapsed: false, isWorking: false, bodyColumns: 12, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
 } as const
 
 const LIVE = JSON.stringify({ limitId: 'codex', windows: [{ usedPercent: 31, windowDurationMins: 300, resetsAt: SEC + 86_400 }] })

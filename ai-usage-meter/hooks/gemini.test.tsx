@@ -19,7 +19,7 @@ const BAND = {
   plugin: 'ai-usage-meter',
   component: 'AbovePrompt',
   requestId: 'band',
-  props: { hasSurvey: false, isWorking: false, bodyColumns: 12, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
+  props: { hasSurvey: false, isCollapsed: false, isWorking: false, bodyColumns: 12, maxRows: 5, scroll: { offset: 0, bodyRows: 5 }, view: {} },
 } as const
 
 type Run = 'ok' | 'exit1' | 'throw' | 'garbage' | 'login' | 'argon'
